@@ -4,7 +4,9 @@ function renderHeader() {
     <div class="announce">Free Shipping for All Orders from Rs. 2500 &nbsp;|&nbsp; Use Code FIRST for 10% Off</div>
     <header class="site-header">
       <div class="header-inner">
-        <a href="/" class="logo">Natrio Organics</a>
+        <a href="/" class="logo">
+          <img src="/images/logo.png" alt="Natrio Organics" class="logo-img">
+        </a>
         <nav class="main-nav">
           <a href="/products.html?category=Hair%20Oils">Hair Oils</a>
           <a href="/products.html?category=Facial%20Care">Facial Care</a>
@@ -22,30 +24,58 @@ function renderHeader() {
 
 function renderFooter() {
   document.body.insertAdjacentHTML('beforeend', `
-    <footer class="site-footer">
+    <footer class="site-footer dark-footer">
       <div class="footer-grid">
-        <div>
-          <h4>Natrio Organics</h4>
-          <p style="opacity:.8;font-size:14px;max-width:320px;">Pure, cold-pressed oils for healthier hair and glowing skin — sourced and bottled with care.</p>
+        <div class="footer-contact">
+          <img src="/images/logo.png" alt="Natrio Organics" class="footer-logo">
+          <p>
+            Lahore, Pakistan<br>
+            Call us: <a href="tel:+920000000000">+92 300 0000000</a><br>
+            Email: <a href="mailto:hello@natrio.pk">hello@natrio.pk</a>
+          </p>
+          <div class="social-row">
+            <a href="https://www.facebook.com/share/18v6kUqF9a/" target="_blank" aria-label="Facebook">f</a>
+            <a href="https://www.instagram.com/natrioorganics" target="_blank" aria-label="Instagram">ig</a>
+            <a href="#" aria-label="Pinterest">p</a>
+          </div>
         </div>
         <div>
-          <h4>Shop</h4>
+          <h4>Categories</h4>
           <ul>
             <li><a href="/products.html?category=Hair%20Oils">Hair Oils</a></li>
             <li><a href="/products.html?category=Facial%20Care">Facial Care</a></li>
+            <li><a href="/products.html">All Products</a></li>
           </ul>
         </div>
         <div>
-          <h4>Information</h4>
+          <h4>Further Info</h4>
           <ul>
-            <li><a href="/cart.html">Cart</a></li>
-            <li><a href="/checkout.html">Checkout</a></li>
+            <li><a href="#">About Us</a></li>
+            <li><a href="#">Contact Us</a></li>
+            <li><a href="#">Shipping &amp; Returns</a></li>
+            <li><a href="#">Privacy Policy</a></li>
           </ul>
         </div>
+        <div class="newsletter-mini">
+          <h4>Newsletter Sign Up</h4>
+          <p>Get updates on new arrivals and offers.</p>
+          <input type="email" placeholder="Enter your email address">
+          <button class="btn btn-primary btn-full" type="button">Submit</button>
+        </div>
       </div>
-      <div class="footer-bottom">&copy; ${new Date().getFullYear()} Natrio Organics. All rights reserved.</div>
+      <div class="dark-footer-bottom">
+        <span>&copy; ${new Date().getFullYear()} Natrio Organics. All rights reserved.</span>
+        <div class="payment-icons">
+          <span>COD</span><span>Visa</span><span>Mastercard</span><span>JazzCash</span><span>Easypaisa</span>
+        </div>
+      </div>
     </footer>
   `);
+}
+
+function scrollSlider(id, dir) {
+  const el = document.getElementById(id);
+  el.scrollBy({ left: dir * (el.clientWidth * 0.8), behavior: 'smooth' });
 }
 
 // ---------- Cart helpers ----------

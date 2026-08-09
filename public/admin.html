@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin — Natrio Organics</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
+  <link rel="apple-touch-icon" href="/images/favicon-180.png">
   <link rel="stylesheet" href="/style.css">
   <style>
     body { background: var(--cream); }
@@ -35,6 +38,7 @@
     <div class="tabs">
       <div class="tab active" data-tab="orders">Orders</div>
       <div class="tab" data-tab="products">Products</div>
+      <div class="tab" data-tab="hero">Hero Slider</div>
     </div>
 
     <div id="ordersTab">
@@ -50,6 +54,14 @@
         <tbody id="productsBody"></tbody>
       </table>
       <p style="font-size:13px;color:#888;margin-top:16px;">To add or edit products in bulk, edit <code>data/products.json</code> directly on your server, or extend this panel with a form (see README for the API routes: POST/PUT/DELETE <code>/api/admin/products</code>).</p>
+    </div>
+
+    <div id="heroTab" class="hidden">
+      <p style="font-size:13px;color:#888;margin-bottom:16px;">Add up to 3 hero slides. Each needs an image path (upload the photo to <code>public/images/</code> first, then reference it here, e.g. <code>/images/hero-2.jpg</code>). Slides rotate automatically every 6 seconds on the homepage.</p>
+      <div id="heroSlideEditors"></div>
+      <button class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);margin-top:10px;" onclick="addHeroSlide()" id="addSlideBtn">+ Add Slide</button>
+      <button class="btn btn-primary" style="margin-top:10px;margin-left:10px;" onclick="saveHeroSlides()">Save Hero Slides</button>
+      <p id="heroSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
     </div>
   </div>
 
@@ -67,6 +79,7 @@
         document.getElementById('adminWrap').classList.remove('hidden');
         loadOrders();
         loadProducts();
+        loadHeroSlides();
       } else {
         document.getElementById('loginErr').textContent = 'Incorrect password.';
       }
@@ -78,6 +91,7 @@
         tab.classList.add('active');
         document.getElementById('ordersTab').classList.toggle('hidden', tab.dataset.tab !== 'orders');
         document.getElementById('productsTab').classList.toggle('hidden', tab.dataset.tab !== 'products');
+        document.getElementById('heroTab').classList.toggle('hidden', tab.dataset.tab !== 'hero');
       });
     });
 
@@ -102,6 +116,86 @@
       document.getElementById('productsBody').innerHTML = products.map(p => `
         <tr><td>${p.title}</td><td>${p.category}</td><td>${money(p.price)}</td><td>${p.stock}</td></tr>
       `).join('');
+    }
+
+    // ---------- Hero slides ----------
+    let heroSlides = [];
+
+    async function loadHeroSlides() {
+      const res = await fetch('/api/admin/hero');
+      heroSlides = await res.json();
+      renderHeroEditors();
+    }
+
+    function renderHeroEditors() {
+      document.getElementById('heroSlideEditors').innerHTML = heroSlides.map((s, i) => `
+        <div style="border:1px solid var(--line);background:white;padding:18px;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <strong>Slide ${i + 1}</strong>
+            <span style="color:#a33;cursor:pointer;font-size:13px;" onclick="removeHeroSlide(${i})">Remove</span>
+          </div>
+          <div class="form-grid">
+            <div class="full">
+              <label>Image path</label>
+              <input value="${s.image || ''}" onchange="updateHeroField(${i},'image',this.value)" placeholder="/images/hero-1.jpg">
+            </div>
+            <div>
+              <label>Eyebrow text</label>
+              <input value="${s.eyebrow || ''}" onchange="updateHeroField(${i},'eyebrow',this.value)">
+            </div>
+            <div>
+              <label>Button text</label>
+              <input value="${s.buttonText || ''}" onchange="updateHeroField(${i},'buttonText',this.value)">
+            </div>
+            <div class="full">
+              <label>Heading</label>
+              <input value="${s.heading || ''}" onchange="updateHeroField(${i},'heading',this.value)">
+            </div>
+            <div class="full">
+              <label>Subtext</label>
+              <input value="${s.subtext || ''}" onchange="updateHeroField(${i},'subtext',this.value)">
+            </div>
+            <div class="full">
+              <label>Button link</label>
+              <input value="${s.buttonUrl || '/products.html'}" onchange="updateHeroField(${i},'buttonUrl',this.value)">
+            </div>
+          </div>
+        </div>
+      `).join('');
+      document.getElementById('addSlideBtn').style.display = heroSlides.length >= 3 ? 'none' : 'inline-block';
+    }
+
+    function updateHeroField(i, field, value) {
+      heroSlides[i][field] = value;
+    }
+
+    function addHeroSlide() {
+      if (heroSlides.length >= 3) return;
+      heroSlides.push({ image: '', eyebrow: '', heading: '', subtext: '', buttonText: 'Shop Now', buttonUrl: '/products.html' });
+      renderHeroEditors();
+    }
+
+    function removeHeroSlide(i) {
+      heroSlides.splice(i, 1);
+      renderHeroEditors();
+    }
+
+    async function saveHeroSlides() {
+      const res = await fetch('/api/admin/hero', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slides: heroSlides })
+      });
+      const data = await res.json();
+      const msg = document.getElementById('heroSaveMsg');
+      if (data.error) {
+        msg.style.color = '#a33';
+        msg.textContent = data.error;
+      } else {
+        msg.style.color = 'var(--olive)';
+        msg.textContent = 'Saved! Refresh the homepage to see the changes.';
+        heroSlides = data.slides;
+        renderHeroEditors();
+      }
     }
   </script>
 </body>

@@ -7,9 +7,11 @@
     "compareAtPrice": null,
     "description": "Nourish your hair naturally with Cold Pressed Extra Virgin Natrio Organics Olive Hair Oil — deeply hydrating and rich in antioxidants to restore shine and strength.",
     "image": "/images/olive-hair-oil.jpg",
+    "hoverImage": "/images/olive-hair-oil-alt.jpg",
     "variants": ["60ml", "100ml"],
     "stock": 100,
-    "featured": true
+    "featured": true,
+    "bestseller": true
   },
   {
     "id": "taramira-oil",
@@ -19,9 +21,11 @@
     "compareAtPrice": null,
     "description": "Experience traditional hair care with Natrio Organics Taramira Oil — a nourishing oil known for stimulating growth and strengthening roots.",
     "image": "/images/taramira-oil.jpg",
+    "hoverImage": "/images/taramira-oil-alt.jpg",
     "variants": ["60ml"],
     "stock": 200,
-    "featured": true
+    "featured": true,
+    "bestseller": true
   },
   {
     "id": "rosehip-seed-oil",
@@ -31,9 +35,11 @@
     "compareAtPrice": null,
     "description": "Reveal naturally radiant skin and healthier-looking hair with Natrio Organics Rosehip Seed Oil — a lightweight, vitamin-rich oil that helps even tone and texture.",
     "image": "/images/rosehip-seed-oil.jpg",
+    "hoverImage": "/images/rosehip-seed-oil-alt.jpg",
     "variants": ["60ml"],
     "stock": 100,
-    "featured": true
+    "featured": true,
+    "bestseller": true
   },
   {
     "id": "onion-oil",
@@ -43,9 +49,11 @@
     "compareAtPrice": null,
     "description": "Strengthen and nourish your hair naturally with Natrio Organics Onion Oil — a nutrient-rich hair oil that helps reduce hair fall and boosts volume.",
     "image": "/images/onion-oil.jpg",
+    "hoverImage": "/images/onion-oil-alt.jpg",
     "variants": ["60ml"],
     "stock": 200,
-    "featured": true
+    "featured": true,
+    "bestseller": true
   },
   {
     "id": "coconut-hair-oil",

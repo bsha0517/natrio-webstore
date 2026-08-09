@@ -9,6 +9,9 @@ const PORT = process.env.PORT || 3000;
 
 const PRODUCTS_FILE = path.join(__dirname, 'data', 'products.json');
 const ORDERS_FILE = path.join(__dirname, 'data', 'orders.json');
+const CATEGORIES_FILE = path.join(__dirname, 'data', 'categories.json');
+const BLOG_FILE = path.join(__dirname, 'data', 'blog.json');
+const HERO_FILE = path.join(__dirname, 'data', 'hero.json');
 
 // make sure orders.json exists
 if (!fs.existsSync(ORDERS_FILE)) fs.writeFileSync(ORDERS_FILE, '[]');
@@ -49,6 +52,18 @@ app.get('/api/products/:id', (req, res) => {
   const product = products.find(p => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   res.json(product);
+});
+
+app.get('/api/categories', (req, res) => {
+  res.json(readJSON(CATEGORIES_FILE));
+});
+
+app.get('/api/blog', (req, res) => {
+  res.json(readJSON(BLOG_FILE));
+});
+
+app.get('/api/hero', (req, res) => {
+  res.json(readJSON(HERO_FILE));
 });
 
 // ---------- CART ROUTES ----------
@@ -167,6 +182,19 @@ app.post('/api/admin/login', (req, res) => {
 
 app.get('/api/admin/orders', requireAdmin, (req, res) => {
   res.json(readJSON(ORDERS_FILE));
+});
+
+app.get('/api/admin/hero', requireAdmin, (req, res) => {
+  res.json(readJSON(HERO_FILE));
+});
+
+app.put('/api/admin/hero', requireAdmin, (req, res) => {
+  let slides = req.body.slides;
+  if (!Array.isArray(slides)) return res.status(400).json({ error: 'slides must be an array' });
+  if (slides.length > 3) slides = slides.slice(0, 3); // hard cap at 3
+  if (slides.length < 1) return res.status(400).json({ error: 'At least one hero slide is required' });
+  writeJSON(HERO_FILE, slides);
+  res.json({ success: true, slides });
 });
 
 app.post('/api/admin/products', requireAdmin, (req, res) => {

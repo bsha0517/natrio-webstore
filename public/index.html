@@ -5,55 +5,66 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Natrio Organics — Pure Cold Pressed Oils</title>
   <meta name="description" content="Natrio Organics offers premium organic cold pressed oils for natural health and everyday wellness.">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
+  <link rel="apple-touch-icon" href="/images/favicon-180.png">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
+  <!-- HERO SLIDER (max 3 slides, editable from /admin.html) -->
   <section class="hero">
-    <div class="hero-inner">
-      <span class="eyebrow">Cold Pressed &middot; Chemical Free</span>
-      <h1>A world of pure cold-pressed goodness</h1>
-      <p>Nourish your hair and skin naturally with oils sourced, pressed, and bottled with care.</p>
-      <a href="/products.html" class="btn btn-primary">Shop the Collection</a>
-    </div>
+    <div id="heroSlides"></div>
+    <div class="hero-dots" id="heroDots"></div>
   </section>
 
-  <section class="icon-boxes">
-    <div class="icon-box"><div class="dot">🚚</div><div><h4>Free Shipping</h4><p>On all orders over Rs. 2500</p></div></div>
-    <div class="icon-box"><div class="dot">↩️</div><div><h4>Money Guarantee</h4><p>Within 15 days for an exchange</p></div></div>
-    <div class="icon-box"><div class="dot">💬</div><div><h4>Online Support</h4><p>24 hours a day, 7 days a week</p></div></div>
-    <div class="icon-box"><div class="dot">🔒</div><div><h4>Flexible Payment</h4><p>COD, cards & mobile wallets</p></div></div>
+  <!-- CATEGORY TILES -->
+  <section style="padding-top:4px;">
+    <div class="category-strip" id="categoryStrip"></div>
   </section>
 
+  <!-- BESTSELLER SLIDER -->
   <section class="section">
     <div class="section-header">
       <span class="eyebrow">Cold Pressed</span>
-      <h2>Hair Oils</h2>
+      <h2>Bestsellers</h2>
     </div>
-    <div class="product-grid" id="hairOilsGrid"></div>
-    <div style="text-align:center;margin-top:36px;">
-      <a href="/products.html?category=Hair%20Oils" class="btn btn-dark">Shop more</a>
+    <div class="slider-row" id="bestsellerSlider"></div>
+    <div class="slider-controls">
+      <button onclick="scrollSlider('bestsellerSlider', -1)" aria-label="Previous">&larr;</button>
+      <button onclick="scrollSlider('bestsellerSlider', 1)" aria-label="Next">&rarr;</button>
     </div>
   </section>
 
+  <!-- BLOG -->
   <section class="section" style="background:var(--white);border-top:1px solid var(--line);border-bottom:1px solid var(--line);">
     <div class="section-header">
-      <h2>Facial Care</h2>
+      <span class="eyebrow">Guides</span>
+      <h2>Natural Hair &amp; Skin Care Guides</h2>
     </div>
-    <div class="product-grid" id="facialCareGrid"></div>
-    <div style="text-align:center;margin-top:36px;">
-      <a href="/products.html?category=Facial%20Care" class="btn btn-dark">Shop more</a>
+    <div class="blog-grid" id="blogGrid"></div>
+  </section>
+
+  <!-- INSTAGRAM -->
+  <section class="section">
+    <div class="section-header">
+      <span class="eyebrow">@natrioorganics</span>
+      <h2>Natrio On Instagram</h2>
     </div>
+    <div class="insta-strip" id="instaStrip"></div>
   </section>
 
   <script src="/script.js"></script>
   <script>
     function productCard(p) {
+      const hover = p.hoverImage ? `<img class="img-alt" src="${p.hoverImage}" alt="" onerror="this.remove()">` : '';
       return `
         <div class="product-card">
           <a href="/product.html?id=${p.id}">
             <div class="thumb">
-              ${p.image ? `<img src="${p.image}" alt="${p.title}" onerror="this.parentElement.innerHTML='<span class=placeholder>${p.title}</span>'">` : `<span class="placeholder">${p.title}</span>`}
+              ${p.image
+                ? `<img class="img-main" src="${p.image}" alt="${p.title}" onerror="this.parentElement.innerHTML='<span class=placeholder>${p.title}</span>'">${hover}`
+                : `<span class="placeholder">${p.title}</span>`}
             </div>
           </a>
           <div class="body">
@@ -65,13 +76,76 @@
         </div>`;
     }
 
-    fetch('/api/products?category=Hair%20Oils')
-      .then(r => r.json())
-      .then(list => { document.getElementById('hairOilsGrid').innerHTML = list.map(productCard).join(''); });
+    // Bestsellers
+    fetch('/api/products').then(r => r.json()).then(list => {
+      const best = list.filter(p => p.bestseller);
+      document.getElementById('bestsellerSlider').innerHTML = (best.length ? best : list).map(productCard).join('');
+    });
 
-    fetch('/api/products?category=Facial%20Care')
-      .then(r => r.json())
-      .then(list => { document.getElementById('facialCareGrid').innerHTML = list.map(productCard).join(''); });
+    // Categories
+    fetch('/api/categories').then(r => r.json()).then(list => {
+      document.getElementById('categoryStrip').innerHTML = list.map(c => `
+        <a class="category-tile" href="${c.url}" style="background-image:url('${c.image}')">
+          <span class="cat-label">${c.title}</span>
+        </a>
+      `).join('');
+    });
+
+    // Blog
+    fetch('/api/blog').then(r => r.json()).then(list => {
+      document.getElementById('blogGrid').innerHTML = list.map(b => `
+        <div class="blog-card">
+          <a href="${b.url}"><div class="thumb"><img src="${b.image}" alt="${b.title}" onerror="this.parentElement.style.background='var(--cream-deep)';this.remove()"></div></a>
+          <div class="body">
+            <h3><a href="${b.url}">${b.title}</a></h3>
+            <p>${b.excerpt}</p>
+            <a class="read-more" href="${b.url}">Read more</a>
+          </div>
+        </div>
+      `).join('');
+    });
+
+    // Instagram strip — reuses product photography until real Instagram photos are added
+    fetch('/api/products').then(r => r.json()).then(list => {
+      const imgs = list.map(p => p.image).filter(Boolean);
+      document.getElementById('instaStrip').innerHTML = imgs.map(src => `
+        <a class="insta-item" href="https://www.instagram.com/natrioorganics" target="_blank" style="background-image:url('${src}')"></a>
+      `).join('');
+    });
+
+    // Hero slider (max 3 slides)
+    let heroIndex = 0, heroTimer;
+    fetch('/api/hero').then(r => r.json()).then(slides => {
+      slides = slides.slice(0, 3);
+      const slidesEl = document.getElementById('heroSlides');
+      const dotsEl = document.getElementById('heroDots');
+
+      slidesEl.innerHTML = slides.map((s, i) => `
+        <div class="hero-slide ${i === 0 ? 'active' : ''}" data-index="${i}">
+          <div class="hero-bg" style="background-image:url('${s.image}')"></div>
+          <div class="hero-inner">
+            ${s.eyebrow ? `<span class="eyebrow">${s.eyebrow}</span>` : ''}
+            <h1>${s.heading || ''}</h1>
+            ${s.subtext ? `<p>${s.subtext}</p>` : ''}
+            ${s.buttonText ? `<a href="${s.buttonUrl || '/products.html'}" class="btn btn-primary">${s.buttonText}</a>` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      if (slides.length > 1) {
+        dotsEl.innerHTML = slides.map((_, i) => `<button class="hero-dot ${i === 0 ? 'active' : ''}" data-index="${i}"></button>`).join('');
+        dotsEl.querySelectorAll('.hero-dot').forEach(dot => {
+          dot.addEventListener('click', () => showHeroSlide(parseInt(dot.dataset.index)));
+        });
+        heroTimer = setInterval(() => showHeroSlide((heroIndex + 1) % slides.length), 6000);
+      }
+
+      function showHeroSlide(i) {
+        heroIndex = i;
+        document.querySelectorAll('.hero-slide').forEach(el => el.classList.toggle('active', parseInt(el.dataset.index) === i));
+        document.querySelectorAll('.hero-dot').forEach(el => el.classList.toggle('active', parseInt(el.dataset.index) === i));
+      }
+    });
   </script>
 </body>
 </html>

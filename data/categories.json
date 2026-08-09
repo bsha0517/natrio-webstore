@@ -1,0 +1,12 @@
+[
+  {
+    "title": "Hair Oils",
+    "url": "/products.html?category=Hair%20Oils",
+    "image": "/images/category-hair-oils.jpg"
+  },
+  {
+    "title": "Facial Care",
+    "url": "/products.html?category=Facial%20Care",
+    "image": "/images/category-facial-care.jpg"
+  }
+]
