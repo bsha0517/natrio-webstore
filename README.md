@@ -54,20 +54,46 @@ Restart the server (`npm start`) after editing.
 Go to **/admin.html**, log in with the password set in `ADMIN_PASSWORD`
 (default: `natrio-admin-2026` — **change this before going live**, see step 6).
 
-## 5. Deploying to the internet (so customers can actually visit it)
+## 5. Deploying to Render.com (recommended)
 
-Cheapest reliable options for a Node.js app like this:
+Render runs your app as a normal, always-on Node.js server — not a
+serverless function — so this project works there with **no code changes**.
+(Vercel does not work with this project — see note at the bottom of this section.)
 
-- **Railway.app** or **Render.com** — free/cheap tiers, connect your GitHub repo, auto-deploys. Easiest for non-technical users.
-- **A VPS** (DigitalOcean, Linode, Hostinger VPS) — more control, ~$5/month, but you manage the server yourself (or pay a freelancer a small one-time fee to set it up with PM2 + Nginx).
-- **cPanel hosting with Node.js support** — many Pakistani hosts (Hostinger, etc.) now support Node apps directly from cPanel.
+**Steps:**
+1. Create a free GitHub account if you don't have one, and upload this
+   whole `natrio-store` folder as a new repository.
+2. Go to [render.com](https://render.com), sign up, click **New +** → **Web Service**.
+3. Connect your GitHub repo. Render will detect `render.yaml` automatically
+   and pre-fill the build command (`npm install`) and start command (`npm start`).
+4. When prompted, set the `ADMIN_PASSWORD` environment variable to something
+   only you know (this protects `/admin.html`). `SESSION_SECRET` is generated
+   for you automatically.
+5. Click **Deploy**. After a couple of minutes you'll get a live URL like
+   `natrio-store.onrender.com`.
+6. To use your own domain (natrio.pk), go to your Render service → **Settings**
+   → **Custom Domains**, add `natrio.pk`, and create the CNAME/A record it
+   gives you at your domain registrar (wherever you bought natrio.pk).
 
-Steps (Railway/Render, easiest path):
-1. Create a free GitHub account, upload this project as a new repository.
-2. Sign up at railway.app or render.com, connect your GitHub repo.
-3. Set the start command to `npm start`.
-4. Add environment variables `SESSION_SECRET` and `ADMIN_PASSWORD` (random strong values).
-5. Deploy — you'll get a live URL. Point your domain (natrio.pk) at it via a CNAME record from your domain registrar.
+**⚠️ Important — data persistence on Render's free tier:**
+This project stores orders and products in JSON files on disk
+(`data/orders.json`, `data/products.json`). Render's **free tier** wipes the
+disk on every redeploy and restart — so accumulated orders could be lost.
+For a real store taking real orders, either:
+- Upgrade to a **paid Render plan and add a Persistent Disk** (Render →
+  your service → **Disks** → mount at `/opt/render/project/src/data`), or
+- Move orders to a proper database later (e.g. a free tier of
+  Postgres/MongoDB) — worth asking a developer to help with this once
+  you're getting consistent orders.
+
+For testing and getting the site live to look at, the free tier is fine.
+Just don't rely on it yet for orders you can't afford to lose.
+
+**Why Vercel didn't work:** Vercel runs your backend as short-lived,
+read-only serverless functions, so it can't write to `orders.json` or hold
+cart sessions in memory the way this project expects — that's what caused
+the `FUNCTION_INVOCATION_FAILED` error. Render (and Railway) don't have
+this limitation.
 
 ## 6. Before going live — security checklist
 
