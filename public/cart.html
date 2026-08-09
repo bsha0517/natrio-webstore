@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your Cart — Natrio Organics</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <div class="page-header"><h1>Your Cart</h1></div>
+
+  <div class="cart-layout">
+    <div id="itemsCol"><p>Loading…</p></div>
+    <div class="summary-box" id="summaryCol"></div>
+  </div>
+
+  <script src="/script.js"></script>
+  <script>
+    async function loadCart() {
+      const res = await fetch('/api/cart');
+      const data = await res.json();
+
+      if (!data.items.length) {
+        document.getElementById('itemsCol').innerHTML = `<div class="empty-state">Your cart is empty.<br><br><a href="/products.html" class="btn btn-dark">Continue Shopping</a></div>`;
+        document.getElementById('summaryCol').innerHTML = '';
+        return;
+      }
+
+      document.getElementById('itemsCol').innerHTML = data.items.map(i => `
+        <div class="cart-item">
+          <div class="thumb">${i.product?.image ? `<img src="${i.product.image}" style="width:100%;height:100%;object-fit:cover;">` : ''}</div>
+          <div class="info">
+            <h4>${i.product ? i.product.title : 'Unknown product'}</h4>
+            <div class="variant">${i.variant}</div>
+            <div class="remove-link" onclick="removeItem('${i.productId}','${i.variant}')">Remove</div>
+          </div>
+          <div class="qty-control">
+            <button onclick="updateQty('${i.productId}','${i.variant}', ${i.qty - 1})">−</button>
+            <input type="number" value="${i.qty}" min="1" onchange="updateQty('${i.productId}','${i.variant}', this.value)">
+            <button onclick="updateQty('${i.productId}','${i.variant}', ${i.qty + 1})">+</button>
+          </div>
+          <div style="width:80px;text-align:right;font-weight:600;">${money((i.product?.price||0) * i.qty)}</div>
+        </div>
+      `).join('');
+
+      const shipping = data.subtotal >= 2500 ? 0 : 200;
+      document.getElementById('summaryCol').innerHTML = `
+        <h3>Order Summary</h3>
+        <div class="summary-row"><span>Subtotal</span><span>${money(data.subtotal)}</span></div>
+        <div class="summary-row"><span>Shipping</span><span>${shipping === 0 ? 'Free' : money(shipping)}</span></div>
+        <div class="summary-row total"><span>Total</span><span>${money(data.subtotal + shipping)}</span></div>
+        <a href="/checkout.html" class="btn btn-primary btn-full" style="margin-top:16px;">Proceed to Checkout</a>
+        <a href="/products.html" class="btn btn-outline btn-full" style="margin-top:10px;color:var(--olive-dark);border-color:var(--line);">Continue Shopping</a>
+      `;
+      refreshCartCount();
+    }
+
+    async function updateQty(productId, variant, qty) {
+      qty = parseInt(qty);
+      if (!qty || qty < 1) return removeItem(productId, variant);
+      await fetch('/api/cart/update', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ productId, variant, qty })
+      });
+      loadCart();
+    }
+
+    async function removeItem(productId, variant) {
+      await fetch('/api/cart/remove', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ productId, variant })
+      });
+      loadCart();
+    }
+
+    loadCart();
+  </script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Natrio Organics — Pure Cold Pressed Oils</title>
+  <meta name="description" content="Natrio Organics offers premium organic cold pressed oils for natural health and everyday wellness.">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <span class="eyebrow">Cold Pressed &middot; Chemical Free</span>
+      <h1>A world of pure cold-pressed goodness</h1>
+      <p>Nourish your hair and skin naturally with oils sourced, pressed, and bottled with care.</p>
+      <a href="/products.html" class="btn btn-primary">Shop the Collection</a>
+    </div>
+  </section>
+
+  <section class="icon-boxes">
+    <div class="icon-box"><div class="dot">🚚</div><div><h4>Free Shipping</h4><p>On all orders over Rs. 2500</p></div></div>
+    <div class="icon-box"><div class="dot">↩️</div><div><h4>Money Guarantee</h4><p>Within 15 days for an exchange</p></div></div>
+    <div class="icon-box"><div class="dot">💬</div><div><h4>Online Support</h4><p>24 hours a day, 7 days a week</p></div></div>
+    <div class="icon-box"><div class="dot">🔒</div><div><h4>Flexible Payment</h4><p>COD, cards & mobile wallets</p></div></div>
+  </section>
+
+  <section class="section">
+    <div class="section-header">
+      <span class="eyebrow">Cold Pressed</span>
+      <h2>Hair Oils</h2>
+    </div>
+    <div class="product-grid" id="hairOilsGrid"></div>
+    <div style="text-align:center;margin-top:36px;">
+      <a href="/products.html?category=Hair%20Oils" class="btn btn-dark">Shop more</a>
+    </div>
+  </section>
+
+  <section class="section" style="background:var(--white);border-top:1px solid var(--line);border-bottom:1px solid var(--line);">
+    <div class="section-header">
+      <h2>Facial Care</h2>
+    </div>
+    <div class="product-grid" id="facialCareGrid"></div>
+    <div style="text-align:center;margin-top:36px;">
+      <a href="/products.html?category=Facial%20Care" class="btn btn-dark">Shop more</a>
+    </div>
+  </section>
+
+  <script src="/script.js"></script>
+  <script>
+    function productCard(p) {
+      return `
+        <div class="product-card">
+          <a href="/product.html?id=${p.id}">
+            <div class="thumb">
+              ${p.image ? `<img src="${p.image}" alt="${p.title}" onerror="this.parentElement.innerHTML='<span class=placeholder>${p.title}</span>'">` : `<span class="placeholder">${p.title}</span>`}
+            </div>
+          </a>
+          <div class="body">
+            <span class="category">${p.category}</span>
+            <h3><a href="/product.html?id=${p.id}">${p.title}</a></h3>
+            <div class="price">${money(p.price)}</div>
+            <button class="add-btn" onclick="addToCart('${p.id}','${p.variants[0]}',1).then(()=>this.textContent='Added ✓')">Add to Cart</button>
+          </div>
+        </div>`;
+    }
+
+    fetch('/api/products?category=Hair%20Oils')
+      .then(r => r.json())
+      .then(list => { document.getElementById('hairOilsGrid').innerHTML = list.map(productCard).join(''); });
+
+    fetch('/api/products?category=Facial%20Care')
+      .then(r => r.json())
+      .then(list => { document.getElementById('facialCareGrid').innerHTML = list.map(productCard).join(''); });
+  </script>
+</body>
+</html>

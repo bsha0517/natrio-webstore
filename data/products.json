@@ -1,0 +1,74 @@
+[
+  {
+    "id": "olive-hair-oil",
+    "title": "Olive Hair Oil",
+    "category": "Hair Oils",
+    "price": 260,
+    "compareAtPrice": null,
+    "description": "Nourish your hair naturally with Cold Pressed Extra Virgin Natrio Organics Olive Hair Oil — deeply hydrating and rich in antioxidants to restore shine and strength.",
+    "image": "/images/olive-hair-oil.jpg",
+    "variants": ["60ml", "100ml"],
+    "stock": 100,
+    "featured": true
+  },
+  {
+    "id": "taramira-oil",
+    "title": "Taramira Oil 60ml",
+    "category": "Hair Oils",
+    "price": 160,
+    "compareAtPrice": null,
+    "description": "Experience traditional hair care with Natrio Organics Taramira Oil — a nourishing oil known for stimulating growth and strengthening roots.",
+    "image": "/images/taramira-oil.jpg",
+    "variants": ["60ml"],
+    "stock": 200,
+    "featured": true
+  },
+  {
+    "id": "rosehip-seed-oil",
+    "title": "Rosehip Seed Oil 60ml",
+    "category": "Facial Care",
+    "price": 660,
+    "compareAtPrice": null,
+    "description": "Reveal naturally radiant skin and healthier-looking hair with Natrio Organics Rosehip Seed Oil — a lightweight, vitamin-rich oil that helps even tone and texture.",
+    "image": "/images/rosehip-seed-oil.jpg",
+    "variants": ["60ml"],
+    "stock": 100,
+    "featured": true
+  },
+  {
+    "id": "onion-oil",
+    "title": "Onion Oil 60ml",
+    "category": "Hair Oils",
+    "price": 780,
+    "compareAtPrice": null,
+    "description": "Strengthen and nourish your hair naturally with Natrio Organics Onion Oil — a nutrient-rich hair oil that helps reduce hair fall and boosts volume.",
+    "image": "/images/onion-oil.jpg",
+    "variants": ["60ml"],
+    "stock": 200,
+    "featured": true
+  },
+  {
+    "id": "coconut-hair-oil",
+    "title": "Coconut Hair Oil",
+    "category": "Hair Oils",
+    "price": 200,
+    "compareAtPrice": null,
+    "description": "Give your hair the nourishment it deserves with Natrio Organics Coconut Hair Oil — a lightweight, deeply moisturizing everyday oil.",
+    "image": "/images/coconut-hair-oil.jpg",
+    "variants": ["60ml", "100ml"],
+    "stock": 200,
+    "featured": true
+  },
+  {
+    "id": "rose-water-mist",
+    "title": "Rose Water Facial Mist 125ml",
+    "category": "Facial Care",
+    "price": 120,
+    "compareAtPrice": null,
+    "description": "Refresh, hydrate, and glow naturally with Natrio Organics Rose Water Facial Mist — a pure, alcohol-free toner for everyday use.",
+    "image": "/images/rose-water-mist.jpg",
+    "variants": ["125ml"],
+    "stock": 100,
+    "featured": true
+  }
+]

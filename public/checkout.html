@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Checkout — Natrio Organics</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <div class="page-header"><h1>Checkout</h1></div>
+
+  <div class="cart-layout">
+    <div>
+      <form id="checkoutForm">
+        <h3>Contact & Delivery</h3>
+        <div class="form-grid">
+          <div><label>Full Name *</label><input name="name" required></div>
+          <div><label>Phone *</label><input name="phone" required placeholder="03xx-xxxxxxx"></div>
+          <div class="full"><label>Email</label><input name="email" type="email"></div>
+          <div class="full"><label>Address *</label><input name="address" required></div>
+          <div><label>City *</label><input name="city" required></div>
+          <div><label>Postal Code</label><input name="zip"></div>
+          <div class="full"><label>Order Notes (optional)</label><textarea name="notes"></textarea></div>
+        </div>
+
+        <h3 style="margin-top:26px;">Payment Method</h3>
+        <div class="pay-options" id="payOptions">
+          <label class="pay-option selected"><input type="radio" name="paymentMethod" value="cod" checked style="margin:0;"> Cash on Delivery</label>
+          <label class="pay-option"><input type="radio" name="paymentMethod" value="card" style="margin:0;"> Credit / Debit Card (Stripe)</label>
+          <label class="pay-option"><input type="radio" name="paymentMethod" value="jazzcash" style="margin:0;"> JazzCash</label>
+          <label class="pay-option"><input type="radio" name="paymentMethod" value="easypaisa" style="margin:0;"> Easypaisa</label>
+        </div>
+        <p style="font-size:12px;color:#888;">Card / JazzCash / Easypaisa require a merchant account to go live — see the setup notes in the project README. Cash on Delivery works immediately.</p>
+
+        <button type="submit" class="btn btn-primary btn-full" style="margin-top:20px;">Place Order</button>
+      </form>
+    </div>
+
+    <div class="summary-box" id="summaryCol"></div>
+  </div>
+
+  <script src="/script.js"></script>
+  <script>
+    async function loadSummary() {
+      const res = await fetch('/api/cart');
+      const data = await res.json();
+      if (!data.items.length) {
+        location.href = '/cart.html';
+        return;
+      }
+      const shipping = data.subtotal >= 2500 ? 0 : 200;
+      document.getElementById('summaryCol').innerHTML = `
+        <h3>Order Summary</h3>
+        ${data.items.map(i => `
+          <div class="summary-row"><span>${i.product.title} (${i.variant}) × ${i.qty}</span><span>${money(i.product.price * i.qty)}</span></div>
+        `).join('')}
+        <div class="summary-row"><span>Shipping</span><span>${shipping === 0 ? 'Free' : money(shipping)}</span></div>
+        <div class="summary-row total"><span>Total</span><span>${money(data.subtotal + shipping)}</span></div>
+      `;
+    }
+    loadSummary();
+
+    document.querySelectorAll('.pay-option').forEach(el => {
+      el.addEventListener('click', () => {
+        document.querySelectorAll('.pay-option').forEach(o => o.classList.remove('selected'));
+        el.classList.add('selected');
+      });
+    });
+
+    document.getElementById('checkoutForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const btn = e.target.querySelector('button[type=submit]');
+      btn.textContent = 'Placing order…';
+      btn.disabled = true;
+
+      const res = await fetch('/api/checkout', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.error) {
+        alert(data.error);
+        btn.textContent = 'Place Order';
+        btn.disabled = false;
+        return;
+      }
+      location.href = `/order-confirmation.html?id=${data.orderId}`;
+    });
+  </script>
+</body>
+</html>

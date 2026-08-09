@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Product — Natrio Organics</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .pd-layout { display:grid; grid-template-columns:1fr 1fr; gap:50px; max-width:var(--max); margin:0 auto; padding:40px 24px 80px; }
+    @media (max-width:760px){ .pd-layout{ grid-template-columns:1fr; } }
+    .pd-image { aspect-ratio:1/1; background:var(--cream-deep); display:flex; align-items:center; justify-content:center; }
+    .pd-image .placeholder { font-family:'Fraunces',serif; color:var(--olive); opacity:.3; font-size:20px; }
+    .pd-price { font-size:22px; color:var(--olive-dark); font-weight:600; margin:10px 0 20px; }
+    .variant-select { margin-bottom:20px; }
+    .pd-desc { color:#555; margin-bottom:26px; }
+    .qty-row { display:flex; align-items:center; gap:16px; margin-bottom:22px; }
+  </style>
+</head>
+<body>
+  <div class="pd-layout" id="pd">Loading…</div>
+
+  <script src="/script.js"></script>
+  <script>
+    const id = new URLSearchParams(location.search).get('id');
+    fetch(`/api/products/${id}`).then(r => r.json()).then(p => {
+      if (p.error) {
+        document.getElementById('pd').innerHTML = `<div class="empty-state">Product not found.</div>`;
+        return;
+      }
+      document.getElementById('pd').innerHTML = `
+        <div class="pd-image">
+          ${p.image ? `<img src="${p.image}" alt="${p.title}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<span class=placeholder>${p.title}</span>'">` : `<span class="placeholder">${p.title}</span>`}
+        </div>
+        <div>
+          <span class="category" style="color:var(--gold);font-size:12px;letter-spacing:.1em;text-transform:uppercase;">${p.category}</span>
+          <h1>${p.title}</h1>
+          <div class="pd-price">${money(p.price)}</div>
+          <p class="pd-desc">${p.description}</p>
+
+          <div class="variant-select">
+            <label>Size</label>
+            <select id="variant">
+              ${p.variants.map(v => `<option value="${v}">${v}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="qty-row">
+            <label style="margin-bottom:0;">Quantity</label>
+            <div class="qty-control">
+              <button onclick="document.getElementById('qty').stepDown()">−</button>
+              <input id="qty" type="number" value="1" min="1">
+              <button onclick="document.getElementById('qty').stepUp()">+</button>
+            </div>
+          </div>
+
+          <button class="btn btn-primary btn-full" id="addBtn">Add to Cart — ${money(p.price)}</button>
+        </div>
+      `;
+      document.getElementById('addBtn').addEventListener('click', async function() {
+        const variant = document.getElementById('variant').value;
+        const qty = parseInt(document.getElementById('qty').value) || 1;
+        await addToCart(p.id, variant, qty);
+        this.textContent = 'Added to cart ✓';
+        setTimeout(() => { this.textContent = `Add to Cart — ${money(p.price)}`; }, 1500);
+      });
+    });
+  </script>
+</body>
+</html>

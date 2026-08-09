@@ -1,0 +1,16 @@
+{
+  "name": "natrio-store",
+  "version": "1.0.0",
+  "description": "Self-hosted ecommerce store for Natrio Organics",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "nodemailer": "^6.9.13",
+    "uuid": "^9.0.1"
+  }
+}
