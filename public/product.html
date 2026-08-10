@@ -4,6 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Product — Natrio Organics</title>
+  <meta name="description" id="metaDescription" content="Shop pure, cold-pressed oils from Natrio Organics.">
+  <link rel="canonical" id="canonicalLink" href="https://natrio.pk/product.html">
+  <meta property="og:type" content="product">
+  <meta property="og:title" id="ogTitle" content="Natrio Organics">
+  <meta property="og:description" id="ogDescription" content="Shop pure, cold-pressed oils from Natrio Organics.">
+  <meta property="og:url" id="ogUrl" content="https://natrio.pk/product.html">
+  <meta property="og:image" id="ogImage" content="https://natrio.pk/images/logo.png">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
   <link rel="apple-touch-icon" href="/images/favicon-180.png">
@@ -135,6 +143,39 @@
         return;
       }
       currentProduct = p;
+
+      // ---- SEO: title, meta tags, canonical, and Product structured data ----
+      const shortDesc = (p.description || '').replace(/<[^>]+>/g, '').slice(0, 155);
+      const pageUrl = `https://natrio.pk/product.html?id=${p.id}`;
+      const imgUrl = p.image ? `https://natrio.pk${p.image}` : 'https://natrio.pk/images/logo.png';
+
+      document.title = `${p.title} — Natrio Organics`;
+      document.getElementById('metaDescription').setAttribute('content', shortDesc || `Shop ${p.title} from Natrio Organics.`);
+      document.getElementById('canonicalLink').setAttribute('href', pageUrl);
+      document.getElementById('ogTitle').setAttribute('content', `${p.title} — Natrio Organics`);
+      document.getElementById('ogDescription').setAttribute('content', shortDesc || `Shop ${p.title} from Natrio Organics.`);
+      document.getElementById('ogUrl').setAttribute('content', pageUrl);
+      document.getElementById('ogImage').setAttribute('content', imgUrl);
+
+      const ldScript = document.createElement('script');
+      ldScript.type = 'application/ld+json';
+      ldScript.textContent = JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: p.title,
+        image: imgUrl,
+        description: shortDesc || p.title,
+        sku: p.sku || p.id,
+        brand: { '@type': 'Brand', name: 'Natrio Organics' },
+        offers: {
+          '@type': 'Offer',
+          url: pageUrl,
+          priceCurrency: 'PKR',
+          price: p.price,
+          availability: p.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock'
+        }
+      });
+      document.head.appendChild(ldScript);
 
       // breadcrumb
       document.getElementById('breadcrumb').innerHTML = `

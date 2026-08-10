@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin — Natrio Organics</title>
+  <meta name="robots" content="noindex, nofollow">
   <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
   <link rel="apple-touch-icon" href="/images/favicon-180.png">
@@ -57,9 +58,11 @@
       <div class="tab" data-tab="categories">Categories</div>
       <div class="tab" data-tab="shipping">Shipping</div>
       <div class="tab" data-tab="discounts">Discounts</div>
+      <div class="tab" data-tab="instagram">Instagram</div>
       <div class="tab" data-tab="hero">Hero Slider</div>
       <div class="tab" data-tab="blog">Blog</div>
       <div class="tab" data-tab="messages">Messages</div>
+      <div class="tab" data-tab="marketing">Marketing</div>
     </div>
 
     <div id="ordersTab">
@@ -205,6 +208,14 @@
       </table>
     </div>
 
+    <div id="instagramTab" class="hidden">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Add your real Instagram posts here. Upload the photo to <code>public/images/</code> first, then paste the direct link to that post (e.g. <code>https://www.instagram.com/p/XXXXXXXXX/</code>) so each card opens the actual post, not just your profile.</p>
+      <div id="instagramEditors"></div>
+      <button class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);margin-top:6px;" onclick="addInstagramRow()">+ Add Post</button>
+      <button class="btn btn-primary" style="margin-top:6px;margin-left:10px;" onclick="saveInstagramPosts()">Save Instagram Posts</button>
+      <p id="instaSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
+    </div>
+
     <div id="heroTab" class="hidden">
       <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Add up to 3 hero slides. Each needs an image path (upload the photo to <code>public/images/</code> first, then reference it here, e.g. <code>/images/hero-2.jpg</code>). Slides rotate automatically every 6 seconds on the homepage.</p>
       <div id="heroSlideEditors"></div>
@@ -217,6 +228,40 @@
       <table>
         <thead><tr><th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Message</th><th>Emailed?</th></tr></thead>
         <tbody id="messagesBody"></tbody>
+      </table>
+    </div>
+
+    <div id="marketingTab" class="hidden">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:20px;">
+        Send an email to everyone who's opted in — from the footer newsletter form, the checkout opt-in checkbox, or new account sign-ups. This uses the same Gmail setup as your contact form and order emails (see the README's "Email notifications" section if you haven't configured that yet).
+      </p>
+
+      <div style="display:flex;gap:24px;margin-bottom:24px;">
+        <div style="background:white;border:1px solid var(--line);padding:16px 20px;">
+          <div style="font-size:22px;font-weight:600;color:var(--olive-dark);" id="subscriberCount">—</div>
+          <div style="font-size:12px;color:var(--muted);">Active subscribers</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--line);background:white;padding:20px;margin-bottom:24px;">
+        <label>Subject</label>
+        <input id="campaignSubject" placeholder="e.g. 20% off this weekend only 🌿">
+        <label style="margin-top:14px;">Message (HTML allowed — e.g. &lt;p&gt;, &lt;b&gt;, &lt;a href=&quot;...&quot;&gt;)</label>
+        <textarea id="campaignBody" rows="8" placeholder="Write your email here..."></textarea>
+
+        <div style="display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;">
+          <input id="testEmailInput" placeholder="Send a test to yourself first (your email)" style="flex:1;min-width:220px;">
+          <button class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);" onclick="sendTestCampaign()">Send Test</button>
+        </div>
+
+        <button class="btn btn-primary" onclick="sendCampaign()" style="margin-top:16px;">Send to All Subscribers</button>
+        <p id="campaignMsg" style="font-size:13px;margin-top:10px;"></p>
+      </div>
+
+      <h3 style="margin-bottom:12px;">Subscriber List</h3>
+      <table>
+        <thead><tr><th>Email</th><th>Source</th><th>Subscribed</th><th>Status</th><th></th></tr></thead>
+        <tbody id="subscribersBody"></tbody>
       </table>
     </div>
 
@@ -283,7 +328,9 @@
         loadCategories();
         loadShippingMethods();
         loadDiscounts();
+        loadInstagramPosts();
         loadMessages();
+        loadSubscribers();
         loadBlogPosts();
       } else {
         document.getElementById('loginErr').textContent = 'Incorrect password.';
@@ -299,8 +346,10 @@
         document.getElementById('categoriesTab').classList.toggle('hidden', tab.dataset.tab !== 'categories');
         document.getElementById('shippingTab').classList.toggle('hidden', tab.dataset.tab !== 'shipping');
         document.getElementById('discountsTab').classList.toggle('hidden', tab.dataset.tab !== 'discounts');
+        document.getElementById('instagramTab').classList.toggle('hidden', tab.dataset.tab !== 'instagram');
         document.getElementById('heroTab').classList.toggle('hidden', tab.dataset.tab !== 'hero');
         document.getElementById('messagesTab').classList.toggle('hidden', tab.dataset.tab !== 'messages');
+        document.getElementById('marketingTab').classList.toggle('hidden', tab.dataset.tab !== 'marketing');
         document.getElementById('blogTab').classList.toggle('hidden', tab.dataset.tab !== 'blog');
       });
     });
@@ -744,6 +793,68 @@
       loadDiscounts();
     }
 
+    // ---------- Instagram posts ----------
+    let instagramPosts = [];
+
+    async function loadInstagramPosts() {
+      const res = await fetch('/api/admin/instagram');
+      instagramPosts = await res.json();
+      renderInstagramEditors();
+    }
+
+    function renderInstagramEditors() {
+      document.getElementById('instagramEditors').innerHTML = instagramPosts.map((p, i) => `
+        <div style="border:1px solid var(--line);background:white;padding:16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <strong>Post ${i + 1}</strong>
+            <span style="color:#a33;cursor:pointer;font-size:13px;" onclick="removeInstagramRow(${i})">Remove</span>
+          </div>
+          <div class="form-grid">
+            <div>
+              <label>Image path</label>
+              <input value="${p.image || ''}" onchange="updateInstagramField(${i},'image',this.value)" placeholder="/images/insta-1.jpg">
+            </div>
+            <div>
+              <label>Link to the actual post</label>
+              <input value="${p.postUrl || ''}" onchange="updateInstagramField(${i},'postUrl',this.value)" placeholder="https://www.instagram.com/p/XXXXXXXXX/">
+            </div>
+          </div>
+        </div>
+      `).join('') || '<p style="color:var(--muted);font-size:13px;">No posts yet — add one below.</p>';
+    }
+
+    function updateInstagramField(i, field, value) {
+      instagramPosts[i][field] = value;
+    }
+
+    function addInstagramRow() {
+      instagramPosts.push({ image: '', postUrl: '' });
+      renderInstagramEditors();
+    }
+
+    function removeInstagramRow(i) {
+      instagramPosts.splice(i, 1);
+      renderInstagramEditors();
+    }
+
+    async function saveInstagramPosts() {
+      const res = await fetch('/api/admin/instagram', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ posts: instagramPosts })
+      });
+      const data = await res.json();
+      const msg = document.getElementById('instaSaveMsg');
+      if (data.error) {
+        msg.style.color = '#a33';
+        msg.textContent = data.error;
+      } else {
+        msg.style.color = 'var(--olive)';
+        msg.textContent = 'Saved! Refresh the homepage to see the changes.';
+        instagramPosts = data.posts;
+        renderInstagramEditors();
+      }
+    }
+
     // ---------- Contact messages ----------
     async function loadMessages() {
       const res = await fetch('/api/admin/messages');
@@ -758,6 +869,82 @@
           <td>${m.emailed ? '✅' : '⚠️ Not sent'}</td>
         </tr>
       `).join('') || '<tr><td colspan="6">No messages yet.</td></tr>';
+    }
+
+    // ---------- Marketing / mailing list ----------
+    async function loadSubscribers() {
+      const res = await fetch('/api/admin/subscribers');
+      const subscribers = await res.json();
+      const active = subscribers.filter(s => s.active !== false);
+      document.getElementById('subscriberCount').textContent = active.length;
+      document.getElementById('subscribersBody').innerHTML = subscribers.map(s => `
+        <tr>
+          <td>${s.email}</td>
+          <td style="text-transform:capitalize;">${(s.source || '').replace('_', ' ')}</td>
+          <td>${new Date(s.subscribedAt).toLocaleDateString()}</td>
+          <td>${s.active !== false ? '✅ Active' : '⏸️ Unsubscribed'}</td>
+          <td><span style="color:#a33;cursor:pointer;font-size:13px;" onclick="removeSubscriber('${s.email}')">Remove</span></td>
+        </tr>
+      `).join('') || '<tr><td colspan="5">No subscribers yet.</td></tr>';
+    }
+
+    async function removeSubscriber(email) {
+      if (!confirm(`Remove ${email} from the list?`)) return;
+      await fetch(`/api/admin/subscribers/${encodeURIComponent(email)}`, { method: 'DELETE' });
+      loadSubscribers();
+    }
+
+    async function sendTestCampaign() {
+      const testEmail = document.getElementById('testEmailInput').value.trim();
+      const subject = document.getElementById('campaignSubject').value.trim();
+      const body = document.getElementById('campaignBody').value.trim();
+      const msg = document.getElementById('campaignMsg');
+
+      if (!testEmail) { msg.style.color = '#a33'; msg.textContent = 'Enter your email above to send a test.'; return; }
+      if (!subject || !body) { msg.style.color = '#a33'; msg.textContent = 'Write a subject and message first.'; return; }
+
+      msg.style.color = 'var(--muted)';
+      msg.textContent = 'Sending test…';
+
+      const res = await fetch('/api/admin/campaign/send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, body, testEmail })
+      });
+      const data = await res.json();
+      if (data.error) {
+        msg.style.color = '#a33';
+        msg.textContent = data.error;
+      } else {
+        msg.style.color = 'var(--olive)';
+        msg.textContent = `Test sent to ${testEmail}. Check your inbox before sending to everyone.`;
+      }
+    }
+
+    async function sendCampaign() {
+      const subject = document.getElementById('campaignSubject').value.trim();
+      const body = document.getElementById('campaignBody').value.trim();
+      const msg = document.getElementById('campaignMsg');
+
+      if (!subject || !body) { msg.style.color = '#a33'; msg.textContent = 'Write a subject and message first.'; return; }
+
+      const count = document.getElementById('subscriberCount').textContent;
+      if (!confirm(`Send this email to all ${count} active subscribers? This can't be undone.`)) return;
+
+      msg.style.color = 'var(--muted)';
+      msg.textContent = 'Sending — this may take a moment for larger lists…';
+
+      const res = await fetch('/api/admin/campaign/send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, body })
+      });
+      const data = await res.json();
+      if (data.error) {
+        msg.style.color = '#a33';
+        msg.textContent = data.error;
+      } else {
+        msg.style.color = 'var(--olive)';
+        msg.textContent = `Sent to ${data.sent} of ${data.total} subscribers.${data.failed ? ` ${data.failed} failed.` : ''}`;
+      }
     }
 
     // ---------- Blog ----------

@@ -4,6 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Blog — Natrio Organics</title>
+  <meta name="description" id="metaDescription" content="Natural hair and skin care guides from Natrio Organics.">
+  <link rel="canonical" id="canonicalLink" href="https://natrio.pk/blog.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" id="ogTitle" content="Natrio Organics Blog">
+  <meta property="og:description" id="ogDescription" content="Natural hair and skin care guides from Natrio Organics.">
+  <meta property="og:url" id="ogUrl" content="https://natrio.pk/blog.html">
+  <meta property="og:image" id="ogImage" content="https://natrio.pk/images/logo.png">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
   <link rel="apple-touch-icon" href="/images/favicon-180.png">
@@ -40,6 +48,34 @@
         return;
       }
       document.title = `${post.title} — Natrio Organics`;
+
+      // ---- SEO: meta tags, canonical, and Article structured data ----
+      const shortExcerpt = post.excerpt || post.body.replace(/<[^>]+>/g, '').slice(0, 155);
+      const pageUrl = `https://natrio.pk/blog-post.html?slug=${post.slug}`;
+      const imgUrl = post.image ? `https://natrio.pk${post.image}` : 'https://natrio.pk/images/logo.png';
+
+      document.getElementById('metaDescription').setAttribute('content', shortExcerpt);
+      document.getElementById('canonicalLink').setAttribute('href', pageUrl);
+      document.getElementById('ogTitle').setAttribute('content', `${post.title} — Natrio Organics`);
+      document.getElementById('ogDescription').setAttribute('content', shortExcerpt);
+      document.getElementById('ogUrl').setAttribute('content', pageUrl);
+      document.getElementById('ogImage').setAttribute('content', imgUrl);
+
+      const ldScript = document.createElement('script');
+      ldScript.type = 'application/ld+json';
+      ldScript.textContent = JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        headline: post.title,
+        image: imgUrl,
+        datePublished: post.date,
+        author: { '@type': 'Organization', name: 'Natrio Organics' },
+        publisher: { '@type': 'Organization', name: 'Natrio Organics', logo: { '@type': 'ImageObject', url: 'https://natrio.pk/images/logo.png' } },
+        description: shortExcerpt,
+        mainEntityOfPage: pageUrl
+      });
+      document.head.appendChild(ldScript);
+
       document.getElementById('postWrap').innerHTML = `
         <a href="/blog.html" class="back-link">&larr; Back to all posts</a>
         <h1>${post.title}</h1>

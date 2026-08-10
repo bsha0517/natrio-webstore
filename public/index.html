@@ -3,12 +3,43 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Natrio Organics — Pure Cold Pressed Oils</title>
-  <meta name="description" content="Natrio Organics offers premium organic cold pressed oils for natural health and everyday wellness.">
+  <title>Natrio Organics — Pure Cold-Pressed Oils in Pakistan</title>
+  <meta name="description" content="Shop pure, cold-pressed hair oils and facial care from Natrio Organics — no fillers, no fake promises. Nationwide delivery across Pakistan with Cash on Delivery.">
+  <link rel="canonical" href="https://natrio.pk/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Natrio Organics — Pure Cold-Pressed Oils in Pakistan">
+  <meta property="og:description" content="Shop pure, cold-pressed hair oils and facial care from Natrio Organics — no fillers, no fake promises. Nationwide delivery across Pakistan with Cash on Delivery.">
+  <meta property="og:url" content="https://natrio.pk/">
+  <meta property="og:image" content="https://natrio.pk/images/logo.png">
+  <meta property="og:site_name" content="Natrio Organics">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Natrio Organics — Pure Cold-Pressed Oils in Pakistan">
+  <meta name="twitter:description" content="Shop pure, cold-pressed hair oils and facial care from Natrio Organics — no fillers, no fake promises.">
+  <meta name="twitter:image" content="https://natrio.pk/images/logo.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
   <link rel="apple-touch-icon" href="/images/favicon-180.png">
   <link rel="stylesheet" href="/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Natrio Organics",
+    "url": "https://natrio.pk",
+    "logo": "https://natrio.pk/images/logo.png",
+    "sameAs": [
+      "https://www.facebook.com/share/18v6kUqF9a/",
+      "https://www.instagram.com/natrioorganics"
+    ],
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+92-330-3065888",
+      "contactType": "customer service",
+      "email": "info@natrio.pk",
+      "areaServed": "PK"
+    }
+  }
+  </script>
 </head>
 <body>
 
@@ -154,11 +185,15 @@
       if (list.length <= 2) document.getElementById('blogSliderControls').style.display = 'none';
     });
 
-    // Instagram strip — reuses product photography until real Instagram photos are added
-    fetch('/api/products').then(r => r.json()).then(list => {
-      const imgs = list.map(p => p.image).filter(Boolean);
-      document.getElementById('instaStrip').innerHTML = imgs.map(src => `
-        <a class="insta-item" href="https://www.instagram.com/natrioorganics" target="_blank" style="background-image:url('${src}')"></a>
+    // Instagram strip — pulls real posts you've added in /admin.html → Instagram tab
+    fetch('/api/instagram').then(r => r.json()).then(posts => {
+      const strip = document.getElementById('instaStrip');
+      if (!posts.length) {
+        strip.closest('section').style.display = 'none';
+        return;
+      }
+      strip.innerHTML = posts.map(p => `
+        <a class="insta-item" href="${p.postUrl}" target="_blank" style="background-image:url('${p.image}')"></a>
       `).join('');
     });
 

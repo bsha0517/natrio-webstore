@@ -98,10 +98,11 @@ function renderFooter() {
           </ul>
         </div>
         <div class="newsletter-mini">
-          <h4>Newsletter Sign Up</h4>
-          <p>Get updates on new arrivals and offers.</p>
-          <input type="email" placeholder="Enter your email address">
-          <button class="btn btn-primary btn-full" type="button">Subscribe</button>
+          <h4>Let's get in touch</h4>
+          <p>Join the list &amp; get 10% off your first order — your glow-up starts here ✨</p>
+          <input type="email" placeholder="Enter your email address" id="newsletterEmail">
+          <button class="btn btn-primary btn-full" type="button" onclick="subscribeNewsletter()">Subscribe</button>
+          <p id="newsletterMsg" style="font-size:12px;margin-top:8px;"></p>
         </div>
       </div>
       <div class="dark-footer-bottom">
@@ -121,6 +122,30 @@ function renderFooter() {
 function scrollSlider(id, dir) {
   const el = document.getElementById(id);
   el.scrollBy({ left: dir * (el.clientWidth * 0.8), behavior: 'smooth' });
+}
+
+async function subscribeNewsletter() {
+  const input = document.getElementById('newsletterEmail');
+  const msg = document.getElementById('newsletterMsg');
+  const email = input.value.trim();
+  if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+    msg.style.color = '#e08b8b';
+    msg.textContent = 'Please enter a valid email address.';
+    return;
+  }
+  const res = await fetch('/api/newsletter/subscribe', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
+  const data = await res.json();
+  if (data.error) {
+    msg.style.color = '#e08b8b';
+    msg.textContent = data.error;
+  } else {
+    msg.style.color = '#a9d6a0';
+    msg.textContent = "You're subscribed! Thanks for joining us.";
+    input.value = '';
+  }
 }
 
 // ---------- Cart helpers ----------

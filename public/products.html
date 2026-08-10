@@ -3,7 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Shop — Natrio Organics</title>
+  <title>Shop All Products — Natrio Organics</title>
+  <meta name="description" content="Browse Natrio Organics' full range of pure, cold-pressed hair oils and facial care products. Nationwide delivery across Pakistan.">
+  <link rel="canonical" href="https://natrio.pk/products.html">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Shop All Products — Natrio Organics">
+  <meta property="og:description" content="Browse Natrio Organics' full range of pure, cold-pressed hair oils and facial care products.">
+  <meta property="og:url" content="https://natrio.pk/products.html">
+  <meta property="og:image" content="https://natrio.pk/images/logo.png">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
   <link rel="apple-touch-icon" href="/images/favicon-180.png">
@@ -23,7 +31,12 @@
   <script>
     const params = new URLSearchParams(location.search);
     const category = params.get('category');
-    if (category) document.getElementById('pageTitle').textContent = category;
+    if (category) {
+      document.getElementById('pageTitle').textContent = category;
+      document.title = `${category} — Natrio Organics`;
+      const desc = document.querySelector('meta[name="description"]');
+      if (desc) desc.setAttribute('content', `Shop ${category} from Natrio Organics — pure, cold-pressed, and made in Pakistan.`);
+    }
 
     function productCard(p) {
       return `

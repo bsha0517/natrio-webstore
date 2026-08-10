@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Checkout — Natrio Organics</title>
+  <meta name="robots" content="noindex, nofollow">
   <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
   <link rel="apple-touch-icon" href="/images/favicon-180.png">
@@ -75,6 +76,20 @@
           <label class="pay-option"><input type="radio" name="paymentMethod" value="easypaisa"> <span class="opt-label">Easypaisa</span></label>
         </div>
         <p style="font-size:12px;color:var(--muted);">Card / JazzCash / Easypaisa require a merchant account to go live — see the setup notes in the project README. Cash on Delivery works immediately.</p>
+
+        <label style="display:flex;align-items:flex-start;gap:8px;margin-top:14px;font-size:13px;color:var(--muted);cursor:pointer;" id="createAccountRow">
+          <input type="checkbox" id="createAccountCheckbox" style="width:auto;margin-top:2px;">
+          <span>Create an account with this order for faster checkout next time.</span>
+        </label>
+        <div id="createAccountPasswordRow" class="hidden" style="margin-top:10px;">
+          <label>Choose a password</label>
+          <input type="password" id="createAccountPassword" placeholder="At least 6 characters" minlength="6">
+        </div>
+
+        <label style="display:flex;align-items:flex-start;gap:8px;margin-top:18px;font-size:13px;color:var(--muted);cursor:pointer;">
+          <input type="checkbox" name="subscribeNewsletter" style="width:auto;margin-top:2px;">
+          <span>Email me about offers, new arrivals, and updates from Natrio Organics.</span>
+        </label>
 
         <button type="submit" class="btn btn-primary btn-full" style="margin-top:20px;">Place Order</button>
       </form>
@@ -198,6 +213,18 @@
       cityOtherInput.required = isOther;
     });
 
+    // Show/hide the account creation password field
+    let isLoggedIn = false;
+    fetch('/api/auth/me').then(r => r.json()).then(data => {
+      isLoggedIn = !!data.user;
+      if (isLoggedIn) document.getElementById('createAccountRow').style.display = 'none';
+    });
+
+    document.getElementById('createAccountCheckbox').addEventListener('change', function() {
+      document.getElementById('createAccountPasswordRow').classList.toggle('hidden', !this.checked);
+      document.getElementById('createAccountPassword').required = this.checked;
+    });
+
     document.getElementById('checkoutForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
@@ -214,8 +241,34 @@
 
       if (appliedDiscount) body.discountCode = appliedDiscount.code;
       body.shippingMethodId = selectedShippingId;
+      body.subscribeNewsletter = !!body.subscribeNewsletter;
+
+      const wantsAccount = !isLoggedIn && document.getElementById('createAccountCheckbox').checked;
+      const password = document.getElementById('createAccountPassword').value;
 
       const btn = e.target.querySelector('button[type=submit]');
+
+      // create the account first, if requested, so the order gets linked to it
+      if (wantsAccount) {
+        if (!password || password.length < 6) {
+          alert('Please choose a password of at least 6 characters, or uncheck "Create an account".');
+          return;
+        }
+        btn.textContent = 'Creating your account…';
+        btn.disabled = true;
+        const signupRes = await fetch('/api/auth/signup', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: body.name, email: body.email, password })
+        });
+        const signupData = await signupRes.json();
+        if (signupData.error) {
+          alert(signupData.error);
+          btn.textContent = 'Place Order';
+          btn.disabled = false;
+          return;
+        }
+      }
+
       btn.textContent = 'Placing order…';
       btn.disabled = true;
 

@@ -17,12 +17,15 @@ const HERO_FILE = path.join(__dirname, 'data', 'hero.json');
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 const SHIPPING_FILE = path.join(__dirname, 'data', 'shipping.json');
 const DISCOUNTS_FILE = path.join(__dirname, 'data', 'discounts.json');
+const INSTAGRAM_FILE = path.join(__dirname, 'data', 'instagram.json');
+const SUBSCRIBERS_FILE = path.join(__dirname, 'data', 'subscribers.json');
 const MESSAGES_FILE = path.join(__dirname, 'data', 'messages.json');
 
 // make sure orders.json / users.json / messages.json exist
 if (!fs.existsSync(ORDERS_FILE)) fs.writeFileSync(ORDERS_FILE, '[]');
 if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '[]');
 if (!fs.existsSync(MESSAGES_FILE)) fs.writeFileSync(MESSAGES_FILE, '[]');
+if (!fs.existsSync(SUBSCRIBERS_FILE)) fs.writeFileSync(SUBSCRIBERS_FILE, '[]');
 
 function readJSON(file) {
   return JSON.parse(fs.readFileSync(file, 'utf-8'));
@@ -114,6 +117,26 @@ async function sendShippedEmail(order) {
   }
 }
 
+// ---------- Canonical domain redirect ----------
+// natrio.pk is the primary domain for SEO. Any other domain pointed at this
+// deployment (natrio.com.pk, natrioorganics.com, www. variants, the Render
+// URL, etc.) 301-redirects here so Google treats it as one site, not three.
+const CANONICAL_HOST = 'natrio.pk';
+const ALTERNATE_HOSTS = [
+  'www.natrio.pk',
+  'natrio.com.pk',
+  'www.natrio.com.pk',
+  'natrioorganics.com',
+  'www.natrioorganics.com'
+];
+app.use((req, res, next) => {
+  const host = (req.headers.host || '').toLowerCase().split(':')[0];
+  if (ALTERNATE_HOSTS.includes(host)) {
+    return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
+  }
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
@@ -122,6 +145,54 @@ app.use(session({
   saveUninitialized: true,
   cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 } // 7 days
 }));
+const SITE_URL = process.env.SITE_URL || 'https://natrio.pk';
+
+app.get('/sitemap.xml', (req, res) => {
+  const products = readJSON(PRODUCTS_FILE);
+  const categories = readJSON(CATEGORIES_FILE);
+  const blogPosts = readJSON(BLOG_FILE).filter(p => p.published !== false);
+
+  const staticUrls = [
+    { loc: '/', priority: '1.0', changefreq: 'daily' },
+    { loc: '/products.html', priority: '0.9', changefreq: 'daily' },
+    { loc: '/about-us.html', priority: '0.6', changefreq: 'monthly' },
+    { loc: '/contact-us.html', priority: '0.6', changefreq: 'monthly' },
+    { loc: '/blog.html', priority: '0.7', changefreq: 'weekly' },
+    { loc: '/shipping-policy.html', priority: '0.3', changefreq: 'monthly' },
+    { loc: '/privacy-policy.html', priority: '0.3', changefreq: 'monthly' }
+  ];
+
+  const categoryUrls = categories.map(c => ({
+    loc: `/products.html?category=${encodeURIComponent(c.title)}`,
+    priority: '0.7', changefreq: 'weekly'
+  }));
+
+  const productUrls = products.map(p => ({
+    loc: `/product.html?id=${p.id}`,
+    priority: '0.8', changefreq: 'weekly'
+  }));
+
+  const blogUrls = blogPosts.map(b => ({
+    loc: `/blog-post.html?slug=${b.slug}`,
+    priority: '0.6', changefreq: 'monthly',
+    lastmod: b.date ? b.date.split('T')[0] : undefined
+  }));
+
+  const allUrls = [...staticUrls, ...categoryUrls, ...productUrls, ...blogUrls];
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${allUrls.map(u => `  <url>
+    <loc>${SITE_URL}${u.loc}</loc>
+    ${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}
+    <changefreq>${u.changefreq}</changefreq>
+    <priority>${u.priority}</priority>
+  </url>`).join('\n')}
+</urlset>`;
+
+  res.type('application/xml').send(xml);
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------- helpers ----------
@@ -246,6 +317,42 @@ app.get('/api/shipping', (req, res) => {
   res.json(readJSON(SHIPPING_FILE));
 });
 
+app.get('/api/instagram', (req, res) => {
+  res.json(readJSON(INSTAGRAM_FILE));
+});
+
+// ---------- Subscribers / mailing list ----------
+function addSubscriber(email, source) {
+  if (!email || !/^\S+@\S+\.\S+$/.test(email)) return false;
+  const normalized = email.trim().toLowerCase();
+  const subscribers = readJSON(SUBSCRIBERS_FILE);
+  if (subscribers.find(s => s.email === normalized)) return true; // already subscribed, not an error
+  subscribers.push({ email: normalized, source: source || 'unknown', subscribedAt: new Date().toISOString(), active: true });
+  writeJSON(SUBSCRIBERS_FILE, subscribers);
+  return true;
+}
+
+app.get('/api/newsletter/unsubscribe', (req, res) => {
+  const { email } = req.query;
+  if (!email) return res.status(400).send('Missing email.');
+  const subscribers = readJSON(SUBSCRIBERS_FILE);
+  const sub = subscribers.find(s => s.email === String(email).trim().toLowerCase());
+  if (sub) {
+    sub.active = false;
+    writeJSON(SUBSCRIBERS_FILE, subscribers);
+  }
+  res.send(`<html><body style="font-family:sans-serif;padding:40px;text-align:center;"><h2>You've been unsubscribed</h2><p>${email} will no longer receive marketing emails from Natrio Organics.</p></body></html>`);
+});
+
+app.post('/api/newsletter/subscribe', (req, res) => {
+  const { email } = req.body;
+  if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ error: 'Please enter a valid email address' });
+  }
+  addSubscriber(email, 'newsletter_form');
+  res.json({ success: true });
+});
+
 app.post('/api/discounts/validate', (req, res) => {
   const { code, subtotal } = req.body;
   if (!code) return res.status(400).json({ error: 'Enter a discount code' });
@@ -338,7 +445,7 @@ app.post('/api/cart/remove', (req, res) => {
 
 // ---------- CHECKOUT / ORDER ROUTES ----------
 app.post('/api/checkout', (req, res) => {
-  const { name, email, phone, address, city, paymentMethod, shippingMethodId, discountCode, notes } = req.body;
+  const { name, email, phone, address, city, paymentMethod, shippingMethodId, discountCode, subscribeNewsletter, notes } = req.body;
   const cart = getCart(req);
   if (!cart.length) return res.status(400).json({ error: 'Cart is empty' });
   if (!name || !email || !phone || !address || !city) {
@@ -425,6 +532,9 @@ app.post('/api/checkout', (req, res) => {
   // clear cart
   req.session.cart = [];
 
+  // opt-in to the mailing list, if requested
+  if (subscribeNewsletter) addSubscriber(email, 'checkout');
+
   // send confirmation emails in the background — don't make the customer wait on this
   sendOrderConfirmationEmails(order).catch(err => console.error('Order email error:', err.message));
 
@@ -460,6 +570,66 @@ app.get('/api/admin/orders', requireAdmin, (req, res) => {
 
 app.get('/api/admin/messages', requireAdmin, (req, res) => {
   res.json(readJSON(MESSAGES_FILE).slice().reverse());
+});
+
+app.get('/api/admin/subscribers', requireAdmin, (req, res) => {
+  res.json(readJSON(SUBSCRIBERS_FILE).slice().reverse());
+});
+
+app.delete('/api/admin/subscribers/:email', requireAdmin, (req, res) => {
+  let subscribers = readJSON(SUBSCRIBERS_FILE);
+  subscribers = subscribers.filter(s => s.email !== req.params.email.toLowerCase());
+  writeJSON(SUBSCRIBERS_FILE, subscribers);
+  res.json({ success: true });
+});
+
+app.post('/api/admin/campaign/send', requireAdmin, async (req, res) => {
+  const { subject, body, testEmail } = req.body;
+  if (!subject || !body) return res.status(400).json({ error: 'Subject and body are required' });
+  if (!mailTransporter) {
+    return res.status(400).json({ error: 'Email isn\'t configured yet. Set SMTP_USER and SMTP_PASS first — see the README.' });
+  }
+
+  // send a test to just yourself first, if requested, without touching the subscriber list
+  if (testEmail) {
+    try {
+      await mailTransporter.sendMail({
+        from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
+        to: testEmail,
+        subject: `[TEST] ${subject}`,
+        html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.7;color:#222;">${body}</div>`
+      });
+      return res.json({ success: true, test: true });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to send test email: ' + err.message });
+    }
+  }
+
+  const subscribers = readJSON(SUBSCRIBERS_FILE).filter(s => s.active !== false);
+  if (!subscribers.length) return res.status(400).json({ error: 'There are no active subscribers to send to yet.' });
+
+  let sent = 0;
+  let failed = 0;
+  for (const sub of subscribers) {
+    const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/newsletter/unsubscribe?email=${encodeURIComponent(sub.email)}`;
+    try {
+      await mailTransporter.sendMail({
+        from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
+        to: sub.email,
+        subject,
+        html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.7;color:#222;">${body}</div>
+               <hr style="margin:24px 0;border:none;border-top:1px solid #ddd;">
+               <p style="font-size:12px;color:#888;">You're receiving this because you subscribed to Natrio Organics updates.
+               <a href="${unsubscribeUrl}">Unsubscribe</a></p>`
+      });
+      sent++;
+    } catch (err) {
+      console.error(`Campaign email to ${sub.email} failed:`, err.message);
+      failed++;
+    }
+  }
+
+  res.json({ success: true, sent, failed, total: subscribers.length });
 });
 
 app.get('/api/admin/blog', requireAdmin, (req, res) => {
@@ -682,6 +852,20 @@ app.delete('/api/admin/discounts/:id', requireAdmin, (req, res) => {
   discounts = discounts.filter(d => d.id !== req.params.id);
   writeJSON(DISCOUNTS_FILE, discounts);
   res.json({ success: true });
+});
+
+app.get('/api/admin/instagram', requireAdmin, (req, res) => {
+  res.json(readJSON(INSTAGRAM_FILE));
+});
+
+app.put('/api/admin/instagram', requireAdmin, (req, res) => {
+  const posts = req.body.posts;
+  if (!Array.isArray(posts)) return res.status(400).json({ error: 'posts must be an array' });
+  for (const p of posts) {
+    if (!p.image || !p.postUrl) return res.status(400).json({ error: 'Each post needs an image and a post URL' });
+  }
+  writeJSON(INSTAGRAM_FILE, posts);
+  res.json({ success: true, posts });
 });
 
 app.get('/api/admin/hero', requireAdmin, (req, res) => {

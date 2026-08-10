@@ -78,6 +78,40 @@ match the `category` field used in `data/products.json` exactly (e.g.
 `Hair Oils`), or the "Shop more" link on that card won't show matching
 products.
 
+## 5b. Instagram section
+
+Go to `/admin.html` → **Instagram** tab to manage the "Natrio On Instagram"
+strip on the homepage. Each entry needs an image (upload to
+`public/images/` first) and the direct link to that specific post (e.g.
+`https://www.instagram.com/p/XXXXXXXXX/`) — so clicking a photo takes
+customers to the real post, not just your profile page. If you leave this
+empty, the whole Instagram section hides itself automatically.
+
+## 5c. Customer accounts at checkout, and the mailing list
+
+Shoppers can now check the box "Create an account with this order" during
+checkout to register while placing their first order — no separate signup
+step required. Their order is automatically linked to the new account.
+
+**Where customer data is stored:**
+- `data/orders.json` — every order, with the customer's name/email/phone/
+  address attached (this is your record of who bought what).
+- `data/users.json` — people who created a password-protected account
+  (via signup, or the checkout checkbox above). Passwords are hashed, never
+  stored in plain text.
+- `data/subscribers.json` — your marketing mailing list. People land here
+  only if they explicitly opt in, either through the footer newsletter form
+  or the "email me about offers" checkbox at checkout. This is intentionally
+  separate from orders/accounts — someone can buy from you without joining
+  your mailing list, and vice versa.
+
+**Sending marketing emails:** go to `/admin.html` → **Marketing** tab. Write
+a subject and message (basic HTML is fine — bold text, links, etc.), send
+yourself a test first, then send to everyone on the list. This uses the
+same Gmail SMTP setup as your contact form and order emails (see the
+section below if you haven't configured that yet). Every campaign email
+includes an unsubscribe link automatically.
+
 ## 6. View orders (admin)
 
 Go to **/admin.html**, log in with the password set in `ADMIN_PASSWORD`
@@ -136,9 +170,25 @@ serverless function — so this project works there with **no code changes**.
    add `SMTP_USER`, `SMTP_PASS`, and optionally `CONTACT_EMAIL` here.
 5. Click **Deploy**. After a couple of minutes you'll get a live URL like
    `natrio-store.onrender.com`.
-6. To use your own domain (natrio.pk), go to your Render service → **Settings**
-   → **Custom Domains**, add `natrio.pk`, and create the CNAME/A record it
-   gives you at your domain registrar (wherever you bought natrio.pk).
+6. **Connecting all three domains** (`natrio.pk`, `natrio.com.pk`,
+   `natrioorganics.com`): go to your Render service → **Settings** →
+   **Custom Domains**, and add all three domains (plus their `www.`
+   versions if you own those too) one at a time. Render will show you a
+   CNAME or A record to create for each — add those at whichever registrar
+   you bought each domain from. Render issues free SSL for all of them
+   automatically.
+
+   `natrio.pk` is set as the **canonical domain** in the code — visiting
+   `natrio.com.pk` or `natrioorganics.com` (or their `www.` versions)
+   automatically redirects to `natrio.pk` with the same page. This is
+   intentional and good for SEO: it stops Google from seeing your store as
+   three separate duplicate websites and keeps all your search ranking
+   concentrated on one domain, while the other two still work perfectly
+   fine for anyone who types them in or has them saved. If you'd rather
+   make a *different* domain the canonical one, change `CANONICAL_HOST` and
+   `ALTERNATE_HOSTS` near the top of `server.js`, and update the
+   `https://natrio.pk` references in each page's SEO tags and in
+   `/sitemap.xml`'s `SITE_URL` to match.
 
 **⚠️ Important — data persistence on Render's free tier:**
 This project stores orders and products in JSON files on disk
@@ -209,3 +259,38 @@ natrio-store/
 All colors, fonts, and spacing live in `public/style.css` at the top under
 `:root { ... }`. Change `--olive`, `--gold`, `--cream` to shift the palette
 without touching any other file.
+
+## 13. SEO
+
+The site now has proper SEO built in:
+
+- **Every page** has a unique title, meta description, canonical URL, Open
+  Graph tags (for Facebook/WhatsApp link previews), and Twitter card tags.
+- **Product pages** and **blog posts** generate their title/description/
+  social preview image automatically from your actual product/post data,
+  plus structured data (`Product` and `Article` schema) that helps Google
+  show richer results — star ratings, price, stock status, etc., once you
+  have enough traffic for Google to pick them up.
+- **Private pages** (cart, checkout, account, login, signup, order
+  confirmation, admin) are marked `noindex` so they never show up in search
+  results.
+- **`/sitemap.xml`** is generated automatically and always current — it
+  pulls directly from your live products, categories, and published blog
+  posts, so you never have to update it by hand when you add something in
+  the admin panel.
+- **`/robots.txt`** tells search engines what to crawl and points them to
+  the sitemap.
+
+**One thing to check before going live:** all of this assumes your site
+will be reachable at `https://natrio.pk`. If you deploy somewhere else
+first (like `natrio-store.onrender.com`) before pointing your domain at it,
+set the `SITE_URL` environment variable to match — e.g.
+`SITE_URL=https://natrio-store.onrender.com` — so the sitemap and canonical
+URLs stay accurate. Once `natrio.pk` is live, remove that variable (or set
+it to `https://natrio.pk`) and redeploy.
+
+**After launch:** submit `https://natrio.pk/sitemap.xml` to
+[Google Search Console](https://search.google.com/search-console) and
+[Bing Webmaster Tools](https://www.bing.com/webmasters) — that's what
+actually gets your pages crawled and indexed; none of the above happens
+automatically just by the sitemap existing.
