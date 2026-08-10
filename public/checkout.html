@@ -129,7 +129,7 @@
         document.getElementById('summaryCol').innerHTML = `
           <h3>Order Summary</h3>
           ${data.items.map(i => `
-            <div class="summary-row"><span>${i.product.title} (${i.variant}) × ${i.qty}</span><span>${money(i.product.price * i.qty)}</span></div>
+            <div class="summary-row"><span>${i.product.title} (${i.variant}) × ${i.qty}</span><span>${money(i.unitPrice * i.qty)}</span></div>
           `).join('')}
           ${appliedDiscount ? `<div class="summary-row" style="color:var(--olive);"><span>Discount (${appliedDiscount.code})</span><span>−${money(discountOff)}</span></div>` : ''}
           <div class="summary-row"><span>Shipping${method ? ` (${method.name})` : ''}</span><span>${shipping === 0 ? 'Free' : money(shipping)}</span></div>

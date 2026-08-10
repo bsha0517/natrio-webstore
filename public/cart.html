@@ -44,7 +44,7 @@
             <input type="number" value="${i.qty}" min="1" onchange="updateQty('${i.productId}','${i.variant}', this.value)">
             <button onclick="updateQty('${i.productId}','${i.variant}', ${i.qty + 1})">+</button>
           </div>
-          <div style="width:80px;text-align:right;font-weight:600;">${money((i.product?.price||0) * i.qty)}</div>
+          <div style="width:80px;text-align:right;font-weight:600;">${money((i.unitPrice || 0) * i.qty)}</div>
         </div>
       `).join('');
 

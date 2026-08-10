@@ -78,6 +78,20 @@ async function sendContactEmail(message) {
   }
 }
 
+// Each product's variants can now carry their own price (e.g. 60ml vs
+// 100ml costing different amounts). Falls back to the product's base price
+// for older data that only has plain variant name strings.
+function getVariantPrice(product, variantName) {
+  if (!product) return 0;
+  if (Array.isArray(product.variants)) {
+    const match = product.variants.find(v => (typeof v === 'object' && v !== null ? v.name : v) === variantName);
+    if (match && typeof match === 'object' && match.price !== undefined && match.price !== null && match.price !== '') {
+      return Number(match.price);
+    }
+  }
+  return Number(product.price) || 0;
+}
+
 function orderItemsText(order) {
   return order.items.map(i => `  - ${i.title} (${i.variant}) x${i.qty} — Rs. ${i.price * i.qty}`).join('\n');
 }
@@ -419,9 +433,10 @@ app.get('/api/cart', async (req, res) => {
   const products = await readJSON(PRODUCTS_FILE);
   const detailed = cart.map(item => {
     const product = products.find(p => p.id === item.productId);
-    return { ...item, product };
+    const unitPrice = getVariantPrice(product, item.variant);
+    return { ...item, product, unitPrice };
   });
-  const subtotal = detailed.reduce((sum, i) => sum + (i.product ? i.product.price * i.qty : 0), 0);
+  const subtotal = detailed.reduce((sum, i) => sum + i.unitPrice * i.qty, 0);
   res.json({ items: detailed, subtotal });
 });
 
@@ -436,7 +451,9 @@ app.post('/api/cart/add', async (req, res) => {
   if (existing) {
     existing.qty += (qty || 1);
   } else {
-    cart.push({ productId, variant: variant || product.variants[0], qty: qty || 1 });
+    const defaultVariant = product.variants[0];
+    const defaultVariantName = (typeof defaultVariant === 'object' && defaultVariant !== null) ? defaultVariant.name : defaultVariant;
+    cart.push({ productId, variant: variant || defaultVariantName, qty: qty || 1 });
   }
   res.json({ success: true, cartCount: cart.reduce((n, i) => n + i.qty, 0) });
 });
@@ -491,7 +508,7 @@ app.post('/api/checkout', async (req, res) => {
       title: product ? product.title : 'Unknown',
       variant: item.variant,
       qty: item.qty,
-      price: product ? product.price : 0
+      price: getVariantPrice(product, item.variant)
     };
   });
   const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0);
@@ -974,10 +991,12 @@ app.post('/api/admin/products', requireAdmin, async (req, res) => {
   while (products.find(p => p.id === id)) { id = `${slugify(title)}-${suffix++}`; }
 
   const variants = Array.isArray(req.body.variants) && req.body.variants.length
-    ? req.body.variants
+    ? req.body.variants.map(v => (typeof v === 'object' && v !== null)
+        ? { name: v.name, price: (v.price === null || v.price === undefined || v.price === '' || isNaN(Number(v.price))) ? Number(price) : Number(v.price) }
+        : { name: v, price: Number(price) })
     : (typeof req.body.variants === 'string' && req.body.variants.trim()
-        ? req.body.variants.split(',').map(v => v.trim()).filter(Boolean)
-        : ['Default']);
+        ? req.body.variants.split(',').map(v => ({ name: v.trim(), price: Number(price) })).filter(v => v.name)
+        : [{ name: 'Default', price: Number(price) }]);
 
   const newProduct = {
     id,
@@ -985,6 +1004,7 @@ app.post('/api/admin/products', requireAdmin, async (req, res) => {
     category,
     price: Number(price),
     compareAtPrice: req.body.compareAtPrice ? Number(req.body.compareAtPrice) : null,
+    shortDescription: req.body.shortDescription || '',
     description: description || '',
     image: req.body.image || '',
     hoverImage: req.body.hoverImage || '',
@@ -1014,8 +1034,12 @@ app.put('/api/admin/products/:id', requireAdmin, async (req, res) => {
   if (body.compareAtPrice !== undefined) body.compareAtPrice = body.compareAtPrice ? Number(body.compareAtPrice) : null;
   if (body.stock !== undefined) body.stock = Math.max(0, parseInt(body.stock) || 0);
   if (typeof body.variants === 'string') {
-    body.variants = body.variants.split(',').map(v => v.trim()).filter(Boolean);
-    if (!body.variants.length) body.variants = ['Default'];
+    body.variants = body.variants.split(',').map(v => ({ name: v.trim(), price: body.price })).filter(v => v.name);
+    if (!body.variants.length) body.variants = [{ name: 'Default', price: body.price }];
+  } else if (Array.isArray(body.variants)) {
+    body.variants = body.variants.map(v => (typeof v === 'object' && v !== null)
+      ? { name: v.name, price: (v.price === null || v.price === undefined || v.price === '' || isNaN(Number(v.price))) ? body.price : Number(v.price) }
+      : { name: v, price: body.price });
   }
   body.featured = !!body.featured;
   body.bestseller = !!body.bestseller;

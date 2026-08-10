@@ -143,12 +143,20 @@
             <label>Stock quantity *</label>
             <input id="prodStock" type="number" min="0">
           </div>
-          <div>
-            <label>Variants / sizes (comma-separated)</label>
-            <input id="prodVariants" placeholder="e.g. 60ml, 100ml">
+          <div class="full">
+            <label>Variants / sizes — each with its own price</label>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Every size can cost something different — e.g. 60ml at Rs. 260, 100ml at Rs. 420.</p>
+            <div id="prodVariantRows"></div>
+            <button type="button" class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);padding:8px 16px;font-size:13px;margin-top:6px;" onclick="addVariantRow()">+ Add Size</button>
+          </div>
+          <div class="full">
+            <label>Short description</label>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">One line, shown right under the category label on the product page. Keep this brief.</p>
+            <input id="prodShortDescription" placeholder="e.g. Lightweight cold-pressed oil for daily use">
           </div>
           <div class="full">
             <label>Description</label>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Longer version — shown in the Description tab and on product cards.</p>
             <textarea id="prodDescription" rows="3" placeholder="Shown on the product page and cards"></textarea>
           </div>
           <div>
@@ -180,6 +188,9 @@
             <span id="prodImage4_status" style="font-size:12px;"></span>
           </div>
           <div class="full">
+            <p style="font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 -6px;">Product page tabs</p>
+          </div>
+          <div class="full">
             <label>Ingredients (optional)</label>
             <textarea id="prodIngredients" rows="2" placeholder="e.g. 100% cold-pressed olive oil"></textarea>
           </div>
@@ -189,6 +200,7 @@
           </div>
           <div class="full">
             <label>Key benefits (comma-separated, optional)</label>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Shown as its own "Benefits" tab on the product page, not inline with the description.</p>
             <input id="prodBenefits" placeholder="e.g. Reduces hair fall, Adds shine, Nourishes scalp">
           </div>
           <div>
@@ -583,6 +595,33 @@
       `).join('') || '<tr><td colspan="5">No products yet — click "+ Add Product" to add your first one.</td></tr>';
     }
 
+    let currentVariantRows = [];
+
+    function renderVariantRows() {
+      document.getElementById('prodVariantRows').innerHTML = currentVariantRows.map((v, i) => `
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+          <input placeholder="Size name, e.g. 60ml" value="${v.name}" oninput="updateVariantRow(${i},'name',this.value)" style="flex:2;">
+          <input type="number" min="0" placeholder="Price (PKR)" value="${v.price}" oninput="updateVariantRow(${i},'price',this.value)" style="flex:1;">
+          <span style="color:#a33;cursor:pointer;font-size:13px;flex-shrink:0;" onclick="removeVariantRow(${i})">Remove</span>
+        </div>
+      `).join('');
+    }
+
+    function updateVariantRow(i, field, value) {
+      currentVariantRows[i][field] = value;
+    }
+
+    function addVariantRow() {
+      currentVariantRows.push({ name: '', price: document.getElementById('prodPrice').value || '' });
+      renderVariantRows();
+    }
+
+    function removeVariantRow(i) {
+      if (currentVariantRows.length <= 1) return; // always keep at least one row
+      currentVariantRows.splice(i, 1);
+      renderVariantRows();
+    }
+
     function showNewProductForm() {
       document.getElementById('prodId').value = '';
       document.getElementById('prodTitle').value = '';
@@ -591,7 +630,9 @@
       document.getElementById('prodPrice').value = '';
       document.getElementById('prodCompareAt').value = '';
       document.getElementById('prodStock').value = '';
-      document.getElementById('prodVariants').value = '';
+      currentVariantRows = [{ name: 'Default', price: '' }];
+      renderVariantRows();
+      document.getElementById('prodShortDescription').value = '';
       document.getElementById('prodDescription').value = '';
       document.getElementById('prodImage').value = '';
       document.getElementById('prodHoverImage').value = '';
@@ -621,7 +662,12 @@
       document.getElementById('prodPrice').value = p.price ?? '';
       document.getElementById('prodCompareAt').value = p.compareAtPrice ?? '';
       document.getElementById('prodStock').value = p.stock ?? '';
-      document.getElementById('prodVariants').value = (p.variants || []).join(', ');
+      // normalize: older products may only have plain name strings, with no per-variant price
+      currentVariantRows = (p.variants && p.variants.length ? p.variants : ['Default']).map(v =>
+        (typeof v === 'object' && v !== null) ? { name: v.name, price: v.price ?? p.price ?? '' } : { name: v, price: p.price ?? '' }
+      );
+      renderVariantRows();
+      document.getElementById('prodShortDescription').value = p.shortDescription || '';
       document.getElementById('prodDescription').value = p.description || '';
       document.getElementById('prodImage').value = p.image || '';
       document.getElementById('prodHoverImage').value = p.hoverImage || '';
@@ -639,6 +685,10 @@
 
     async function saveProduct() {
       const id = document.getElementById('prodId').value;
+      const variants = currentVariantRows
+        .map(v => ({ name: (v.name || '').trim(), price: v.price === '' || v.price === undefined ? null : Number(v.price) }))
+        .filter(v => v.name);
+
       const payload = {
         title: document.getElementById('prodTitle').value.trim(),
         category: document.getElementById('prodCategory').value.trim(),
@@ -646,7 +696,8 @@
         price: document.getElementById('prodPrice').value,
         compareAtPrice: document.getElementById('prodCompareAt').value,
         stock: document.getElementById('prodStock').value,
-        variants: document.getElementById('prodVariants').value,
+        variants,
+        shortDescription: document.getElementById('prodShortDescription').value.trim(),
         description: document.getElementById('prodDescription').value.trim(),
         image: document.getElementById('prodImage').value.trim(),
         hoverImage: document.getElementById('prodHoverImage').value.trim(),
@@ -662,6 +713,11 @@
       if (!payload.title || !payload.category || payload.price === '') {
         document.getElementById('prodSaveMsg').style.color = '#a33';
         document.getElementById('prodSaveMsg').textContent = 'Title, category, and price are required.';
+        return;
+      }
+      if (!variants.length) {
+        document.getElementById('prodSaveMsg').style.color = '#a33';
+        document.getElementById('prodSaveMsg').textContent = 'Add at least one size/variant.';
         return;
       }
 

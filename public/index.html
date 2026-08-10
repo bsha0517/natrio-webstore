@@ -142,7 +142,7 @@
             <span class="category ${p.category === 'Facial Care' ? 'rose' : ''}">${p.category}</span>
             <h3><a href="/product.html?id=${p.id}">${p.title}</a></h3>
             <div class="price">${money(p.price)}</div>
-            <button class="add-btn" onclick="addToCart('${p.id}','${p.variants[0]}',1).then(()=>this.textContent='Added ✓')">Add to Cart</button>
+            <button class="add-btn" onclick="addToCart('${p.id}','${(p.variants[0] && p.variants[0].name) || p.variants[0]}',1).then(()=>this.textContent='Added ✓')">Add to Cart</button>
           </div>
         </div>`;
     }

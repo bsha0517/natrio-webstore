@@ -69,10 +69,22 @@ you can mix and match freely.
 You no longer need to edit `data/products.json` by hand — go to
 `/admin.html` → **Products** tab:
 
-- **+ Add Product** to create a new one: title, category, price, an optional
-  "compare at" price (shown crossed out for sales), stock quantity, variants
-  (e.g. `60ml, 100ml`), description, images, ingredients, how-to-use
-  instructions, and key benefits.
+- **+ Add Product** to create a new one: title, category, a base price, an
+  optional "compare at" price (shown crossed out for sales), stock
+  quantity, sizes/variants (each with its own price), a short description,
+  a longer description, images, ingredients, how-to-use instructions, and
+  key benefits.
+- **Each size/variant has its own price.** Add as many as you need (e.g.
+  60ml, 100ml) and set a different price for each — the shopper sees the
+  right price update live as they change the size on the product page, and
+  the cart/checkout/order always charges whichever variant they actually
+  picked, not a single flat price for the product.
+- **Short description vs. Description:** the short one is a single line
+  that appears right under the product's category label near the top of
+  the product page — keep it brief. The longer description shows in the
+  "Description" tab further down the page, along with separate tabs for
+  Benefits, Ingredients, Shipping & Returns, and How To Use (each tab only
+  appears if you've filled in that field).
 - **Edit** any existing product the same way, including its stock count.
 - **Delete** removes it from the store.
 - Checking **"Featured on homepage"** or **"Show in Bestsellers slider"**

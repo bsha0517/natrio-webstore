@@ -144,6 +144,13 @@
       }
       currentProduct = p;
 
+      // Normalize variants: supports both the newer { name, price } shape
+      // and older data that only had plain name strings (falls back to the
+      // product's base price for those).
+      const variants = (p.variants && p.variants.length ? p.variants : ['Default']).map(v =>
+        (typeof v === 'object' && v !== null) ? { name: v.name, price: Number(v.price ?? p.price) } : { name: v, price: Number(p.price) }
+      );
+
       // ---- SEO: title, meta tags, canonical, and Product structured data ----
       const shortDesc = (p.description || '').replace(/<[^>]+>/g, '').slice(0, 155);
       const pageUrl = `https://natrio.pk/product.html?id=${p.id}`;
@@ -168,10 +175,12 @@
         sku: p.sku || p.id,
         brand: { '@type': 'Brand', name: 'Natrio Organics' },
         offers: {
-          '@type': 'Offer',
+          '@type': 'AggregateOffer',
           url: pageUrl,
           priceCurrency: 'PKR',
-          price: p.price,
+          lowPrice: Math.min(...variants.map(v => v.price)),
+          highPrice: Math.max(...variants.map(v => v.price)),
+          offerCount: variants.length,
           availability: p.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock'
         }
       });
@@ -214,20 +223,15 @@
             <strong>Category:</strong> ${p.category}
           </div>
 
-          <p class="pd-desc">${p.description}</p>
-          ${p.benefits ? `
-            <ul class="pd-benefits">
-              ${p.benefits.split(',').map(b => b.trim()).filter(Boolean).map(b => `<li>${b}</li>`).join('')}
-            </ul>
-          ` : ''}
+          <p class="pd-desc">${p.shortDescription || (p.description || '').replace(/<[^>]+>/g, '').slice(0, 140)}</p>
 
-          <div class="pd-price">${money(p.price)}</div>
+          <div class="pd-price" id="pdPrice">${money(variants[0].price)}</div>
           ${stockNote}
 
           <div class="variant-select">
             <label>Size</label>
             <select id="variant">
-              ${p.variants.map(v => `<option value="${v}">${v}</option>`).join('')}
+              ${variants.map(v => `<option value="${v.name}" data-price="${v.price}">${v.name} — ${money(v.price)}</option>`).join('')}
             </select>
           </div>
 
@@ -242,7 +246,7 @@
 
           <div class="pd-actions">
             <button class="btn btn-primary" id="addBtn" ${p.stock === 0 ? 'disabled' : ''}>
-              ${p.stock === 0 ? 'Out of Stock' : `Add to Cart — ${money(p.price)}`}
+              ${p.stock === 0 ? 'Out of Stock' : `Add to Cart — ${money(variants[0].price)}`}
             </button>
             <div class="icon-square" id="wishlistBtn" title="Save for later">♡</div>
             <div class="icon-square" id="shareBtn" title="Share">⤴</div>
@@ -260,6 +264,13 @@
       const tabs = [
         { key: 'description', label: 'Description', html: `<p>${p.description || 'No description yet.'}</p>` }
       ];
+      if (p.benefits) {
+        const benefitsList = p.benefits.split(',').map(b => b.trim()).filter(Boolean);
+        tabs.push({
+          key: 'benefits', label: 'Benefits',
+          html: `<ul class="pd-benefits" style="margin:0;">${benefitsList.map(b => `<li>${b}</li>`).join('')}</ul>`
+        });
+      }
       if (p.ingredients) {
         tabs.push({ key: 'ingredients', label: 'Ingredients', html: `<p>${p.ingredients}</p>` });
       }
@@ -314,6 +325,15 @@
         });
       }
 
+      // update the displayed price when the shopper picks a different size
+      const variantSelect = document.getElementById('variant');
+      variantSelect.addEventListener('change', () => {
+        const selected = variants.find(v => v.name === variantSelect.value) || variants[0];
+        document.getElementById('pdPrice').textContent = money(selected.price);
+        if (addBtn && p.stock > 0) addBtn.textContent = `Add to Cart — ${money(selected.price)}`;
+        document.getElementById('stickyPrice').textContent = money(selected.price);
+      });
+
       // wishlist (local, non-persistent placeholder)
       document.getElementById('wishlistBtn').addEventListener('click', function() {
         this.classList.toggle('active');
@@ -337,7 +357,7 @@
       const sticky = document.getElementById('stickyAtc');
       document.getElementById('stickyImg').src = gallery[0] || '';
       document.getElementById('stickyTitle').textContent = p.title;
-      document.getElementById('stickyPrice').textContent = money(p.price);
+      document.getElementById('stickyPrice').textContent = money(variants[0].price);
       document.getElementById('stickyAddBtn').addEventListener('click', async () => {
         const variant = document.getElementById('variant').value;
         const qty = parseInt(document.getElementById('qty').value) || 1;
@@ -371,7 +391,7 @@
               <span class="category ${rp.category === 'Facial Care' ? 'rose' : ''}">${rp.category}</span>
               <h3><a href="/product.html?id=${rp.id}">${rp.title}</a></h3>
               <div class="price">${money(rp.price)}</div>
-              <button class="add-btn" onclick="addToCart('${rp.id}','${rp.variants[0]}',1).then(()=>this.textContent='Added ✓')">Add to Cart</button>
+              <button class="add-btn" onclick="addToCart('${rp.id}','${(rp.variants[0] && rp.variants[0].name) || rp.variants[0]}',1).then(()=>this.textContent='Added ✓')">Add to Cart</button>
             </div>
           </div>
         `).join('') || '<p style="color:var(--muted);padding:0 24px;">No related products yet.</p>';
