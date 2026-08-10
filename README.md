@@ -239,6 +239,16 @@ on Render's disk. This means:
    string from above.
 3. Save — Render will automatically redeploy with the new variable.
 
+**If deploy logs show a TLS/SSL error** (something like `tlsv1 alert
+internal error` or `SSL routines`), that's not a credentials problem — it's
+a known incompatibility between very new Node.js versions (like Node 24,
+which Render may pick by default) and MongoDB Atlas's TLS handshake. Fix:
+in Render → your service → **Environment**, add `NODE_VERSION` = `20.18.0`
+and save to trigger a redeploy. The project's `package.json` also pins
+Node 20 now, which should make this automatic on fresh deploys — but for
+a service that already exists, adding the environment variable directly is
+the more reliable fix.
+
 ### Moving your existing data into MongoDB (one time only)
 
 If you already have products, categories, shipping methods, or discount

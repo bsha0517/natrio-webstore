@@ -12,3 +12,5 @@ services:
         sync: false
       - key: MONGODB_URI
         sync: false
+      - key: NODE_VERSION
+        value: 20.18.0
