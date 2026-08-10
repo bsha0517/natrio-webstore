@@ -16,20 +16,26 @@ platform fees. Full control over your data, design, and checkout flow.
 
 ## 1. Run it locally (to preview before going live)
 
-You'll need [Node.js](https://nodejs.org) installed (version 18+).
+You'll need [Node.js](https://nodejs.org) installed (version 18+), and a
+MongoDB connection string — see **"Setting up MongoDB Atlas"** further down
+this README if you don't have one yet (it's free and takes a few minutes).
 
 ```bash
 cd natrio-store
 npm install
-npm start
+MONGODB_URI="your-connection-string" npm start
 ```
 
-Then open **http://localhost:3000** in your browser.
+Then open **http://localhost:3000** in your browser. The server won't
+start without `MONGODB_URI` set — that's intentional, since there's no
+local file storage to fall back to anymore.
 
 ## 2. Add your real product photos
 
-Put images in `public/images/` and reference them in `data/products.json`
-under each product's `"image"` field, e.g. `"/images/olive-hair-oil.jpg"`.
+Put images in `public/images/` and reference them in each product's
+`"image"` field via `/admin.html` → **Products** tab (or, if you're editing
+`data/products.json` directly before your first migration to MongoDB, the
+same field name applies there too), e.g. `"/images/olive-hair-oil.jpg"`.
 If no image is set, a text placeholder is shown instead — nothing will break.
 
 ## 3. Managing products &amp; inventory (admin panel)
@@ -53,8 +59,10 @@ flags items with 15 or fewer left, and out-of-stock items show "Out of
 Stock" on the storefront with the Add to Cart button disabled — customers
 can't order more than you actually have.
 
-You can still edit `data/products.json` directly if you prefer working in a
-text editor — just restart the server (`npm start`) after saving.
+Note: `data/products.json` and the other files in `data/` are no longer
+read by the live site — they're just the original seed data used by
+`migrate-to-mongo.js`. Once your data is in MongoDB, manage everything
+through `/admin.html` instead of editing those files.
 
 ## 4. Customer accounts & order tracking
 
@@ -190,19 +198,70 @@ serverless function — so this project works there with **no code changes**.
    `https://natrio.pk` references in each page's SEO tags and in
    `/sitemap.xml`'s `SITE_URL` to match.
 
-**⚠️ Important — data persistence on Render's free tier:**
-This project stores orders and products in JSON files on disk
-(`data/orders.json`, `data/products.json`). Render's **free tier** wipes the
-disk on every redeploy and restart — so accumulated orders could be lost.
-For a real store taking real orders, either:
-- Upgrade to a **paid Render plan and add a Persistent Disk** (Render →
-  your service → **Disks** → mount at `/opt/render/project/src/data`), or
-- Move orders to a proper database later (e.g. a free tier of
-  Postgres/MongoDB) — worth asking a developer to help with this once
-  you're getting consistent orders.
+**✅ Data storage: MongoDB (not local files anymore)**
+This project now stores all its data — orders, products, blog posts,
+subscribers, everything — in a real MongoDB database instead of JSON files
+on Render's disk. This means:
+- Data survives every redeploy and restart automatically, on any Render
+  plan (even the free tier), since it's no longer tied to that specific
+  server's local disk at all.
+- You can run more than one server instance in the future if the store
+  ever needs to scale, since MongoDB (unlike a local disk) can be safely
+  read and written by multiple servers at once.
+- **You do need to set this up before the site will start** — the server
+  won't run without a working `MONGODB_URI`. Steps below.
 
-For testing and getting the site live to look at, the free tier is fine.
-Just don't rely on it yet for orders you can't afford to lose.
+### Setting up MongoDB Atlas (free tier)
+
+1. Go to [mongodb.com/cloud/atlas/register](https://www.mongodb.com/cloud/atlas/register) and create a free account.
+2. Create a new project, then click **Build a Database** → choose the
+   **M0 Free** tier → pick any region close to Pakistan (e.g. Mumbai/AWS
+   `ap-south-1`) → **Create**.
+3. When prompted to create a database user, set a username and password
+   (save these somewhere safe — you'll need them in the connection string).
+4. Under **Network Access**, click **Add IP Address** → **Allow Access from
+   Anywhere** (`0.0.0.0/0`). This is fine for this use case since the
+   database still requires the username/password to connect — it's not
+   publicly readable.
+5. Go to **Database** → click **Connect** on your cluster → **Drivers** →
+   copy the connection string. It looks like:
+   ```
+   mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/natrio?retryWrites=true&w=majority
+   ```
+   Replace `<username>` and `<password>` with the ones from step 3. The
+   `/natrio` part names your database — you can change it, just keep it
+   consistent.
+
+### Adding it to Render
+
+1. Render dashboard → your `natrio-store` service → **Environment**.
+2. Add a new environment variable: `MONGODB_URI` → paste the connection
+   string from above.
+3. Save — Render will automatically redeploy with the new variable.
+
+### Moving your existing data into MongoDB (one time only)
+
+If you already have products, categories, shipping methods, or discount
+codes set up, run this once from your own computer (with Node.js
+installed) to copy them into the new database:
+
+```bash
+cd natrio-store
+npm install
+MONGODB_URI="paste-your-connection-string-here" node migrate-to-mongo.js
+```
+
+This reads whatever's currently in your local `data/*.json` files and
+copies it into MongoDB. **Only run this once** — running it again later
+would overwrite any changes you've made through the live site since. If
+you're starting fresh with no real data yet, you can skip this step
+entirely; the site will just start with empty products/categories/etc.,
+which you can then add through `/admin.html`.
+
+Once `MONGODB_URI` is set on Render and (optionally) you've run the
+migration, your data has no expiry and survives indefinitely — redeploys,
+restarts, and plan changes no longer affect it at all, since it isn't
+stored on Render's servers in the first place.
 
 **Why Vercel didn't work:** Vercel runs your backend as short-lived,
 read-only serverless functions, so it can't write to `orders.json` or hold

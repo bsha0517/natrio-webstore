@@ -1,37 +1,49 @@
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
-const fs = require('fs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const { MongoClient } = require('mongodb');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const PRODUCTS_FILE = path.join(__dirname, 'data', 'products.json');
-const ORDERS_FILE = path.join(__dirname, 'data', 'orders.json');
-const CATEGORIES_FILE = path.join(__dirname, 'data', 'categories.json');
-const BLOG_FILE = path.join(__dirname, 'data', 'blog.json');
-const HERO_FILE = path.join(__dirname, 'data', 'hero.json');
-const USERS_FILE = path.join(__dirname, 'data', 'users.json');
-const SHIPPING_FILE = path.join(__dirname, 'data', 'shipping.json');
-const DISCOUNTS_FILE = path.join(__dirname, 'data', 'discounts.json');
-const INSTAGRAM_FILE = path.join(__dirname, 'data', 'instagram.json');
-const SUBSCRIBERS_FILE = path.join(__dirname, 'data', 'subscribers.json');
-const MESSAGES_FILE = path.join(__dirname, 'data', 'messages.json');
+// ---------- Data storage keys ----------
+// Each of these used to be a JSON file (data/products.json, etc). They're
+// now document keys in MongoDB — one document per "collection", storing the
+// whole array under a `data` field. This keeps the rest of the file (all
+// the route handlers below) almost identical to the old file-based version.
+const PRODUCTS_FILE = 'products';
+const ORDERS_FILE = 'orders';
+const CATEGORIES_FILE = 'categories';
+const BLOG_FILE = 'blog';
+const HERO_FILE = 'hero';
+const USERS_FILE = 'users';
+const SHIPPING_FILE = 'shipping';
+const DISCOUNTS_FILE = 'discounts';
+const INSTAGRAM_FILE = 'instagram';
+const SUBSCRIBERS_FILE = 'subscribers';
+const MESSAGES_FILE = 'messages';
 
-// make sure orders.json / users.json / messages.json exist
-if (!fs.existsSync(ORDERS_FILE)) fs.writeFileSync(ORDERS_FILE, '[]');
-if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '[]');
-if (!fs.existsSync(MESSAGES_FILE)) fs.writeFileSync(MESSAGES_FILE, '[]');
-if (!fs.existsSync(SUBSCRIBERS_FILE)) fs.writeFileSync(SUBSCRIBERS_FILE, '[]');
-
-function readJSON(file) {
-  return JSON.parse(fs.readFileSync(file, 'utf-8'));
+// ---------- MongoDB connection ----------
+if (!process.env.MONGODB_URI) {
+  console.error('MONGODB_URI environment variable is not set. See README for setup instructions.');
+  process.exit(1);
 }
-function writeJSON(file, data) {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+const mongoClient = new MongoClient(process.env.MONGODB_URI);
+let db;
+
+async function readJSON(key) {
+  const doc = await db.collection('store').findOne({ _id: key });
+  return doc ? doc.data : [];
+}
+async function writeJSON(key, data) {
+  await db.collection('store').updateOne(
+    { _id: key },
+    { $set: { data } },
+    { upsert: true }
+  );
 }
 
 // ---------- Email (optional — only sends if SMTP_USER / SMTP_PASS are set) ----------
@@ -129,7 +141,7 @@ const ALTERNATE_HOSTS = [
   'natrioorganics.com',
   'www.natrioorganics.com'
 ];
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   const host = (req.headers.host || '').toLowerCase().split(':')[0];
   if (ALTERNATE_HOSTS.includes(host)) {
     return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
@@ -147,10 +159,10 @@ app.use(session({
 }));
 const SITE_URL = process.env.SITE_URL || 'https://natrio.pk';
 
-app.get('/sitemap.xml', (req, res) => {
-  const products = readJSON(PRODUCTS_FILE);
-  const categories = readJSON(CATEGORIES_FILE);
-  const blogPosts = readJSON(BLOG_FILE).filter(p => p.published !== false);
+app.get('/sitemap.xml', async (req, res) => {
+  const products = await readJSON(PRODUCTS_FILE);
+  const categories = await readJSON(CATEGORIES_FILE);
+  const blogPosts = await readJSON(BLOG_FILE).filter(p => p.published !== false);
 
   const staticUrls = [
     { loc: '/', priority: '1.0', changefreq: 'daily' },
@@ -219,12 +231,12 @@ function requireCustomer(req, res, next) {
 }
 
 // ---------- AUTH ROUTES ----------
-app.post('/api/auth/signup', (req, res) => {
+app.post('/api/auth/signup', async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
-  const users = readJSON(USERS_FILE);
+  const users = await readJSON(USERS_FILE);
   const normalizedEmail = email.trim().toLowerCase();
   if (users.find(u => u.email === normalizedEmail)) {
     return res.status(400).json({ error: 'An account with this email already exists. Try logging in instead.' });
@@ -238,17 +250,17 @@ app.post('/api/auth/signup', (req, res) => {
     createdAt: new Date().toISOString()
   };
   users.push(user);
-  writeJSON(USERS_FILE, users);
+  await writeJSON(USERS_FILE, users);
 
   req.session.userId = user.id;
   res.json({ success: true, user: { id: user.id, name: user.name, email: user.email } });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
 
-  const users = readJSON(USERS_FILE);
+  const users = await readJSON(USERS_FILE);
   const user = users.find(u => u.email === email.trim().toLowerCase());
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ error: 'Incorrect email or password' });
@@ -258,106 +270,106 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ success: true, user: { id: user.id, name: user.name, email: user.email } });
 });
 
-app.post('/api/auth/logout', (req, res) => {
+app.post('/api/auth/logout', async (req, res) => {
   req.session.userId = null;
   res.json({ success: true });
 });
 
-app.get('/api/auth/me', (req, res) => {
+app.get('/api/auth/me', async (req, res) => {
   if (!req.session.userId) return res.json({ user: null });
-  const users = readJSON(USERS_FILE);
+  const users = await readJSON(USERS_FILE);
   const user = users.find(u => u.id === req.session.userId);
   if (!user) return res.json({ user: null });
   res.json({ user: { id: user.id, name: user.name, email: user.email } });
 });
 
 // ---------- CUSTOMER ORDER HISTORY ----------
-app.get('/api/my-orders', requireCustomer, (req, res) => {
-  const orders = readJSON(ORDERS_FILE);
+app.get('/api/my-orders', requireCustomer, async (req, res) => {
+  const orders = await readJSON(ORDERS_FILE);
   const mine = orders.filter(o => o.userId === req.session.userId);
   res.json(mine.slice().reverse());
 });
 
 // ---------- PRODUCT ROUTES ----------
-app.get('/api/products', (req, res) => {
-  const products = readJSON(PRODUCTS_FILE);
+app.get('/api/products', async (req, res) => {
+  const products = await readJSON(PRODUCTS_FILE);
   const { category } = req.query;
   const filtered = category ? products.filter(p => p.category === category) : products;
   res.json(filtered);
 });
 
-app.get('/api/products/:id', (req, res) => {
-  const products = readJSON(PRODUCTS_FILE);
+app.get('/api/products/:id', async (req, res) => {
+  const products = await readJSON(PRODUCTS_FILE);
   const product = products.find(p => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   res.json(product);
 });
 
-app.get('/api/categories', (req, res) => {
-  res.json(readJSON(CATEGORIES_FILE));
+app.get('/api/categories', async (req, res) => {
+  res.json(await readJSON(CATEGORIES_FILE));
 });
 
-app.get('/api/blog', (req, res) => {
-  const posts = readJSON(BLOG_FILE).filter(p => p.published !== false);
+app.get('/api/blog', async (req, res) => {
+  const posts = await readJSON(BLOG_FILE).filter(p => p.published !== false);
   res.json(posts.slice().reverse());
 });
 
-app.get('/api/blog/:slug', (req, res) => {
-  const posts = readJSON(BLOG_FILE);
+app.get('/api/blog/:slug', async (req, res) => {
+  const posts = await readJSON(BLOG_FILE);
   const post = posts.find(p => p.slug === req.params.slug && p.published !== false);
   if (!post) return res.status(404).json({ error: 'Post not found' });
   res.json(post);
 });
 
-app.get('/api/hero', (req, res) => {
-  res.json(readJSON(HERO_FILE));
+app.get('/api/hero', async (req, res) => {
+  res.json(await readJSON(HERO_FILE));
 });
 
-app.get('/api/shipping', (req, res) => {
-  res.json(readJSON(SHIPPING_FILE));
+app.get('/api/shipping', async (req, res) => {
+  res.json(await readJSON(SHIPPING_FILE));
 });
 
-app.get('/api/instagram', (req, res) => {
-  res.json(readJSON(INSTAGRAM_FILE));
+app.get('/api/instagram', async (req, res) => {
+  res.json(await readJSON(INSTAGRAM_FILE));
 });
 
 // ---------- Subscribers / mailing list ----------
-function addSubscriber(email, source) {
+async function addSubscriber(email, source) {
   if (!email || !/^\S+@\S+\.\S+$/.test(email)) return false;
   const normalized = email.trim().toLowerCase();
-  const subscribers = readJSON(SUBSCRIBERS_FILE);
+  const subscribers = await readJSON(SUBSCRIBERS_FILE);
   if (subscribers.find(s => s.email === normalized)) return true; // already subscribed, not an error
   subscribers.push({ email: normalized, source: source || 'unknown', subscribedAt: new Date().toISOString(), active: true });
-  writeJSON(SUBSCRIBERS_FILE, subscribers);
+  await writeJSON(SUBSCRIBERS_FILE, subscribers);
   return true;
 }
 
-app.get('/api/newsletter/unsubscribe', (req, res) => {
+app.get('/api/newsletter/unsubscribe', async (req, res) => {
   const { email } = req.query;
   if (!email) return res.status(400).send('Missing email.');
-  const subscribers = readJSON(SUBSCRIBERS_FILE);
+  const subscribers = await readJSON(SUBSCRIBERS_FILE);
   const sub = subscribers.find(s => s.email === String(email).trim().toLowerCase());
   if (sub) {
     sub.active = false;
-    writeJSON(SUBSCRIBERS_FILE, subscribers);
+    await writeJSON(SUBSCRIBERS_FILE, subscribers);
   }
   res.send(`<html><body style="font-family:sans-serif;padding:40px;text-align:center;"><h2>You've been unsubscribed</h2><p>${email} will no longer receive marketing emails from Natrio Organics.</p></body></html>`);
 });
 
-app.post('/api/newsletter/subscribe', (req, res) => {
+app.post('/api/newsletter/subscribe', async (req, res) => {
   const { email } = req.body;
   if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
     return res.status(400).json({ error: 'Please enter a valid email address' });
   }
-  addSubscriber(email, 'newsletter_form');
+  await addSubscriber(email, 'newsletter_form');
   res.json({ success: true });
 });
 
-app.post('/api/discounts/validate', (req, res) => {
+app.post('/api/discounts/validate', async (req, res) => {
   const { code, subtotal } = req.body;
   if (!code) return res.status(400).json({ error: 'Enter a discount code' });
 
-  const discounts = readJSON(DISCOUNTS_FILE);
+  const discounts = await readJSON(DISCOUNTS_FILE);
   const discount = discounts.find(d => d.code.toLowerCase() === String(code).trim().toLowerCase());
 
   if (!discount) return res.status(404).json({ error: 'That discount code isn\'t valid' });
@@ -392,17 +404,17 @@ app.post('/api/contact', async (req, res) => {
 
   entry.emailed = await sendContactEmail(entry);
 
-  const messages = readJSON(MESSAGES_FILE);
+  const messages = await readJSON(MESSAGES_FILE);
   messages.push(entry);
-  writeJSON(MESSAGES_FILE, messages);
+  await writeJSON(MESSAGES_FILE, messages);
 
   res.json({ success: true });
 });
 
 // ---------- CART ROUTES ----------
-app.get('/api/cart', (req, res) => {
+app.get('/api/cart', async (req, res) => {
   const cart = getCart(req);
-  const products = readJSON(PRODUCTS_FILE);
+  const products = await readJSON(PRODUCTS_FILE);
   const detailed = cart.map(item => {
     const product = products.find(p => p.id === item.productId);
     return { ...item, product };
@@ -411,9 +423,9 @@ app.get('/api/cart', (req, res) => {
   res.json({ items: detailed, subtotal });
 });
 
-app.post('/api/cart/add', (req, res) => {
+app.post('/api/cart/add', async (req, res) => {
   const { productId, variant, qty } = req.body;
-  const products = readJSON(PRODUCTS_FILE);
+  const products = await readJSON(PRODUCTS_FILE);
   const product = products.find(p => p.id === productId);
   if (!product) return res.status(404).json({ error: 'Product not found' });
 
@@ -427,7 +439,7 @@ app.post('/api/cart/add', (req, res) => {
   res.json({ success: true, cartCount: cart.reduce((n, i) => n + i.qty, 0) });
 });
 
-app.post('/api/cart/update', (req, res) => {
+app.post('/api/cart/update', async (req, res) => {
   const { productId, variant, qty } = req.body;
   const cart = getCart(req);
   const item = cart.find(i => i.productId === productId && i.variant === variant);
@@ -437,14 +449,14 @@ app.post('/api/cart/update', (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/api/cart/remove', (req, res) => {
+app.post('/api/cart/remove', async (req, res) => {
   const { productId, variant } = req.body;
   req.session.cart = getCart(req).filter(i => !(i.productId === productId && i.variant === variant));
   res.json({ success: true });
 });
 
 // ---------- CHECKOUT / ORDER ROUTES ----------
-app.post('/api/checkout', (req, res) => {
+app.post('/api/checkout', async (req, res) => {
   const { name, email, phone, address, city, paymentMethod, shippingMethodId, discountCode, subscribeNewsletter, notes } = req.body;
   const cart = getCart(req);
   if (!cart.length) return res.status(400).json({ error: 'Cart is empty' });
@@ -459,7 +471,7 @@ app.post('/api/checkout', (req, res) => {
     return res.status(400).json({ error: 'Please enter a valid Pakistani mobile number (e.g. 03xx-xxxxxxx)' });
   }
 
-  const products = readJSON(PRODUCTS_FILE);
+  const products = await readJSON(PRODUCTS_FILE);
 
   // Verify stock is available before placing the order
   for (const item of cart) {
@@ -486,7 +498,7 @@ app.post('/api/checkout', (req, res) => {
   let discountAmount = 0;
   let appliedDiscountCode = null;
   if (discountCode) {
-    const discounts = readJSON(DISCOUNTS_FILE);
+    const discounts = await readJSON(DISCOUNTS_FILE);
     const discount = discounts.find(d => d.code.toLowerCase() === String(discountCode).trim().toLowerCase());
     if (discount && discount.active !== false && (!discount.expiresAt || new Date(discount.expiresAt) >= new Date()) && (!discount.minSubtotal || subtotal >= discount.minSubtotal)) {
       discountAmount = discount.type === 'percent' ? Math.round(subtotal * (discount.value / 100)) : Math.min(discount.value, subtotal);
@@ -494,7 +506,7 @@ app.post('/api/checkout', (req, res) => {
     }
   }
 
-  const shippingMethods = readJSON(SHIPPING_FILE);
+  const shippingMethods = await readJSON(SHIPPING_FILE);
   const method = shippingMethods.find(m => m.id === shippingMethodId) || shippingMethods[0];
   if (!method) return res.status(400).json({ error: 'No shipping method available. Please contact the store.' });
   const shipping = (method.freeThreshold && subtotal >= method.freeThreshold) ? 0 : method.cost;
@@ -518,22 +530,22 @@ app.post('/api/checkout', (req, res) => {
     notes: notes || ''
   };
 
-  const orders = readJSON(ORDERS_FILE);
+  const orders = await readJSON(ORDERS_FILE);
   orders.push(order);
-  writeJSON(ORDERS_FILE, orders);
+  await writeJSON(ORDERS_FILE, orders);
 
   // deduct inventory now that the order is confirmed
   for (const item of cart) {
     const product = products.find(p => p.id === item.productId);
     if (product) product.stock = Math.max(0, product.stock - item.qty);
   }
-  writeJSON(PRODUCTS_FILE, products);
+  await writeJSON(PRODUCTS_FILE, products);
 
   // clear cart
   req.session.cart = [];
 
   // opt-in to the mailing list, if requested
-  if (subscribeNewsletter) addSubscriber(email, 'checkout');
+  if (subscribeNewsletter) await addSubscriber(email, 'checkout');
 
   // send confirmation emails in the background — don't make the customer wait on this
   sendOrderConfirmationEmails(order).catch(err => console.error('Order email error:', err.message));
@@ -541,8 +553,8 @@ app.post('/api/checkout', (req, res) => {
   res.json({ success: true, orderId: order.id, total: order.total });
 });
 
-app.get('/api/order/:id', (req, res) => {
-  const orders = readJSON(ORDERS_FILE);
+app.get('/api/order/:id', async (req, res) => {
+  const orders = await readJSON(ORDERS_FILE);
   const order = orders.find(o => o.id === req.params.id);
   if (!order) return res.status(404).json({ error: 'Order not found' });
   res.json(order);
@@ -556,7 +568,7 @@ function requireAdmin(req, res, next) {
   res.status(401).json({ error: 'Not authorized' });
 }
 
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', async (req, res) => {
   if (req.body.password === ADMIN_PASSWORD) {
     req.session.isAdmin = true;
     return res.json({ success: true });
@@ -564,22 +576,22 @@ app.post('/api/admin/login', (req, res) => {
   res.status(401).json({ error: 'Wrong password' });
 });
 
-app.get('/api/admin/orders', requireAdmin, (req, res) => {
-  res.json(readJSON(ORDERS_FILE));
+app.get('/api/admin/orders', requireAdmin, async (req, res) => {
+  res.json(await readJSON(ORDERS_FILE));
 });
 
-app.get('/api/admin/messages', requireAdmin, (req, res) => {
-  res.json(readJSON(MESSAGES_FILE).slice().reverse());
+app.get('/api/admin/messages', requireAdmin, async (req, res) => {
+  res.json(await readJSON(MESSAGES_FILE).slice().reverse());
 });
 
-app.get('/api/admin/subscribers', requireAdmin, (req, res) => {
-  res.json(readJSON(SUBSCRIBERS_FILE).slice().reverse());
+app.get('/api/admin/subscribers', requireAdmin, async (req, res) => {
+  res.json(await readJSON(SUBSCRIBERS_FILE).slice().reverse());
 });
 
-app.delete('/api/admin/subscribers/:email', requireAdmin, (req, res) => {
-  let subscribers = readJSON(SUBSCRIBERS_FILE);
+app.delete('/api/admin/subscribers/:email', requireAdmin, async (req, res) => {
+  let subscribers = await readJSON(SUBSCRIBERS_FILE);
   subscribers = subscribers.filter(s => s.email !== req.params.email.toLowerCase());
-  writeJSON(SUBSCRIBERS_FILE, subscribers);
+  await writeJSON(SUBSCRIBERS_FILE, subscribers);
   res.json({ success: true });
 });
 
@@ -605,7 +617,7 @@ app.post('/api/admin/campaign/send', requireAdmin, async (req, res) => {
     }
   }
 
-  const subscribers = readJSON(SUBSCRIBERS_FILE).filter(s => s.active !== false);
+  const subscribers = await readJSON(SUBSCRIBERS_FILE).filter(s => s.active !== false);
   if (!subscribers.length) return res.status(400).json({ error: 'There are no active subscribers to send to yet.' });
 
   let sent = 0;
@@ -632,19 +644,19 @@ app.post('/api/admin/campaign/send', requireAdmin, async (req, res) => {
   res.json({ success: true, sent, failed, total: subscribers.length });
 });
 
-app.get('/api/admin/blog', requireAdmin, (req, res) => {
-  res.json(readJSON(BLOG_FILE).slice().reverse());
+app.get('/api/admin/blog', requireAdmin, async (req, res) => {
+  res.json(await readJSON(BLOG_FILE).slice().reverse());
 });
 
 function slugify(title) {
   return title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
-app.post('/api/admin/blog', requireAdmin, (req, res) => {
+app.post('/api/admin/blog', requireAdmin, async (req, res) => {
   const { title, excerpt, body, image, published } = req.body;
   if (!title || !body) return res.status(400).json({ error: 'Title and body are required' });
 
-  const posts = readJSON(BLOG_FILE);
+  const posts = await readJSON(BLOG_FILE);
   let slug = slugify(title);
   let suffix = 1;
   while (posts.find(p => p.slug === slug)) { slug = `${slugify(title)}-${suffix++}`; }
@@ -660,12 +672,12 @@ app.post('/api/admin/blog', requireAdmin, (req, res) => {
     date: new Date().toISOString()
   };
   posts.push(post);
-  writeJSON(BLOG_FILE, posts);
+  await writeJSON(BLOG_FILE, posts);
   res.json({ success: true, post });
 });
 
-app.put('/api/admin/blog/:id', requireAdmin, (req, res) => {
-  const posts = readJSON(BLOG_FILE);
+app.put('/api/admin/blog/:id', requireAdmin, async (req, res) => {
+  const posts = await readJSON(BLOG_FILE);
   const idx = posts.findIndex(p => p.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Post not found' });
 
@@ -684,23 +696,23 @@ app.put('/api/admin/blog/:id', requireAdmin, (req, res) => {
     image: image ?? posts[idx].image,
     published: published !== undefined ? published : posts[idx].published
   };
-  writeJSON(BLOG_FILE, posts);
+  await writeJSON(BLOG_FILE, posts);
   res.json({ success: true, post: posts[idx] });
 });
 
-app.delete('/api/admin/blog/:id', requireAdmin, (req, res) => {
-  let posts = readJSON(BLOG_FILE);
+app.delete('/api/admin/blog/:id', requireAdmin, async (req, res) => {
+  let posts = await readJSON(BLOG_FILE);
   posts = posts.filter(p => p.id !== req.params.id);
-  writeJSON(BLOG_FILE, posts);
+  await writeJSON(BLOG_FILE, posts);
   res.json({ success: true });
 });
 
-app.put('/api/admin/orders/:id/status', requireAdmin, (req, res) => {
+app.put('/api/admin/orders/:id/status', requireAdmin, async (req, res) => {
   const { status } = req.body;
   const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
   if (!validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid status' });
 
-  const orders = readJSON(ORDERS_FILE);
+  const orders = await readJSON(ORDERS_FILE);
   const order = orders.find(o => o.id === req.params.id);
   if (!order) return res.status(404).json({ error: 'Order not found' });
 
@@ -709,23 +721,23 @@ app.put('/api/admin/orders/:id/status', requireAdmin, (req, res) => {
   order.status = status;
   if (!order.statusHistory) order.statusHistory = [];
   order.statusHistory.push({ status, date: new Date().toISOString() });
-  writeJSON(ORDERS_FILE, orders);
+  await writeJSON(ORDERS_FILE, orders);
 
   // restore inventory if the order is newly cancelled; deduct again if it's un-cancelled
   if (status === 'cancelled' && !wasCancelled) {
-    const products = readJSON(PRODUCTS_FILE);
+    const products = await readJSON(PRODUCTS_FILE);
     for (const item of order.items) {
       const product = products.find(p => p.id === item.productId);
       if (product) product.stock += item.qty;
     }
-    writeJSON(PRODUCTS_FILE, products);
+    await writeJSON(PRODUCTS_FILE, products);
   } else if (status !== 'cancelled' && wasCancelled) {
-    const products = readJSON(PRODUCTS_FILE);
+    const products = await readJSON(PRODUCTS_FILE);
     for (const item of order.items) {
       const product = products.find(p => p.id === item.productId);
       if (product) product.stock = Math.max(0, product.stock - item.qty);
     }
-    writeJSON(PRODUCTS_FILE, products);
+    await writeJSON(PRODUCTS_FILE, products);
   }
 
   // notify the customer when their order ships
@@ -736,26 +748,26 @@ app.put('/api/admin/orders/:id/status', requireAdmin, (req, res) => {
   res.json({ success: true, order });
 });
 
-app.get('/api/admin/categories', requireAdmin, (req, res) => {
-  res.json(readJSON(CATEGORIES_FILE));
+app.get('/api/admin/categories', requireAdmin, async (req, res) => {
+  res.json(await readJSON(CATEGORIES_FILE));
 });
 
-app.post('/api/admin/categories', requireAdmin, (req, res) => {
+app.post('/api/admin/categories', requireAdmin, async (req, res) => {
   const { title, image } = req.body;
   if (!title) return res.status(400).json({ error: 'Category title is required' });
-  const categories = readJSON(CATEGORIES_FILE);
+  const categories = await readJSON(CATEGORIES_FILE);
   const category = {
     title,
     url: `/products.html?category=${encodeURIComponent(title)}`,
     image: image || ''
   };
   categories.push(category);
-  writeJSON(CATEGORIES_FILE, categories);
+  await writeJSON(CATEGORIES_FILE, categories);
   res.json({ success: true, category });
 });
 
-app.put('/api/admin/categories/:index', requireAdmin, (req, res) => {
-  const categories = readJSON(CATEGORIES_FILE);
+app.put('/api/admin/categories/:index', requireAdmin, async (req, res) => {
+  const categories = await readJSON(CATEGORIES_FILE);
   const idx = parseInt(req.params.index);
   if (!categories[idx]) return res.status(404).json({ error: 'Category not found' });
   const { title, image } = req.body;
@@ -764,24 +776,24 @@ app.put('/api/admin/categories/:index', requireAdmin, (req, res) => {
     url: `/products.html?category=${encodeURIComponent(title || categories[idx].title)}`,
     image: image !== undefined ? image : categories[idx].image
   };
-  writeJSON(CATEGORIES_FILE, categories);
+  await writeJSON(CATEGORIES_FILE, categories);
   res.json({ success: true, category: categories[idx] });
 });
 
-app.delete('/api/admin/categories/:index', requireAdmin, (req, res) => {
-  const categories = readJSON(CATEGORIES_FILE);
+app.delete('/api/admin/categories/:index', requireAdmin, async (req, res) => {
+  const categories = await readJSON(CATEGORIES_FILE);
   const idx = parseInt(req.params.index);
   if (!categories[idx]) return res.status(404).json({ error: 'Category not found' });
   categories.splice(idx, 1);
-  writeJSON(CATEGORIES_FILE, categories);
+  await writeJSON(CATEGORIES_FILE, categories);
   res.json({ success: true });
 });
 
-app.get('/api/admin/shipping', requireAdmin, (req, res) => {
-  res.json(readJSON(SHIPPING_FILE));
+app.get('/api/admin/shipping', requireAdmin, async (req, res) => {
+  res.json(await readJSON(SHIPPING_FILE));
 });
 
-app.put('/api/admin/shipping', requireAdmin, (req, res) => {
+app.put('/api/admin/shipping', requireAdmin, async (req, res) => {
   const methods = req.body.methods;
   if (!Array.isArray(methods)) return res.status(400).json({ error: 'methods must be an array' });
   if (methods.length < 1) return res.status(400).json({ error: 'At least one shipping method is required' });
@@ -795,22 +807,22 @@ app.put('/api/admin/shipping', requireAdmin, (req, res) => {
     m.freeThreshold = m.freeThreshold === '' || m.freeThreshold === undefined ? null : Number(m.freeThreshold);
   }
 
-  writeJSON(SHIPPING_FILE, methods);
+  await writeJSON(SHIPPING_FILE, methods);
   res.json({ success: true, methods });
 });
 
-app.get('/api/admin/discounts', requireAdmin, (req, res) => {
-  res.json(readJSON(DISCOUNTS_FILE));
+app.get('/api/admin/discounts', requireAdmin, async (req, res) => {
+  res.json(await readJSON(DISCOUNTS_FILE));
 });
 
-app.post('/api/admin/discounts', requireAdmin, (req, res) => {
+app.post('/api/admin/discounts', requireAdmin, async (req, res) => {
   const { code, type, value, minSubtotal, expiresAt } = req.body;
   if (!code || !type || value === undefined || value === null || isNaN(Number(value))) {
     return res.status(400).json({ error: 'Code, type, and a numeric value are required' });
   }
   if (!['percent', 'fixed'].includes(type)) return res.status(400).json({ error: 'Type must be "percent" or "fixed"' });
 
-  const discounts = readJSON(DISCOUNTS_FILE);
+  const discounts = await readJSON(DISCOUNTS_FILE);
   const normalizedCode = String(code).trim().toUpperCase();
   if (discounts.find(d => d.code === normalizedCode)) {
     return res.status(400).json({ error: 'A discount with this code already exists' });
@@ -826,12 +838,12 @@ app.post('/api/admin/discounts', requireAdmin, (req, res) => {
     active: true
   };
   discounts.push(discount);
-  writeJSON(DISCOUNTS_FILE, discounts);
+  await writeJSON(DISCOUNTS_FILE, discounts);
   res.json({ success: true, discount });
 });
 
-app.put('/api/admin/discounts/:id', requireAdmin, (req, res) => {
-  const discounts = readJSON(DISCOUNTS_FILE);
+app.put('/api/admin/discounts/:id', requireAdmin, async (req, res) => {
+  const discounts = await readJSON(DISCOUNTS_FILE);
   const idx = discounts.findIndex(d => d.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Discount not found' });
 
@@ -843,51 +855,51 @@ app.put('/api/admin/discounts/:id', requireAdmin, (req, res) => {
   if (expiresAt !== undefined) discounts[idx].expiresAt = expiresAt || null;
   if (active !== undefined) discounts[idx].active = !!active;
 
-  writeJSON(DISCOUNTS_FILE, discounts);
+  await writeJSON(DISCOUNTS_FILE, discounts);
   res.json({ success: true, discount: discounts[idx] });
 });
 
-app.delete('/api/admin/discounts/:id', requireAdmin, (req, res) => {
-  let discounts = readJSON(DISCOUNTS_FILE);
+app.delete('/api/admin/discounts/:id', requireAdmin, async (req, res) => {
+  let discounts = await readJSON(DISCOUNTS_FILE);
   discounts = discounts.filter(d => d.id !== req.params.id);
-  writeJSON(DISCOUNTS_FILE, discounts);
+  await writeJSON(DISCOUNTS_FILE, discounts);
   res.json({ success: true });
 });
 
-app.get('/api/admin/instagram', requireAdmin, (req, res) => {
-  res.json(readJSON(INSTAGRAM_FILE));
+app.get('/api/admin/instagram', requireAdmin, async (req, res) => {
+  res.json(await readJSON(INSTAGRAM_FILE));
 });
 
-app.put('/api/admin/instagram', requireAdmin, (req, res) => {
+app.put('/api/admin/instagram', requireAdmin, async (req, res) => {
   const posts = req.body.posts;
   if (!Array.isArray(posts)) return res.status(400).json({ error: 'posts must be an array' });
   for (const p of posts) {
     if (!p.image || !p.postUrl) return res.status(400).json({ error: 'Each post needs an image and a post URL' });
   }
-  writeJSON(INSTAGRAM_FILE, posts);
+  await writeJSON(INSTAGRAM_FILE, posts);
   res.json({ success: true, posts });
 });
 
-app.get('/api/admin/hero', requireAdmin, (req, res) => {
-  res.json(readJSON(HERO_FILE));
+app.get('/api/admin/hero', requireAdmin, async (req, res) => {
+  res.json(await readJSON(HERO_FILE));
 });
 
-app.put('/api/admin/hero', requireAdmin, (req, res) => {
+app.put('/api/admin/hero', requireAdmin, async (req, res) => {
   let slides = req.body.slides;
   if (!Array.isArray(slides)) return res.status(400).json({ error: 'slides must be an array' });
   if (slides.length > 3) slides = slides.slice(0, 3); // hard cap at 3
   if (slides.length < 1) return res.status(400).json({ error: 'At least one hero slide is required' });
-  writeJSON(HERO_FILE, slides);
+  await writeJSON(HERO_FILE, slides);
   res.json({ success: true, slides });
 });
 
-app.post('/api/admin/products', requireAdmin, (req, res) => {
+app.post('/api/admin/products', requireAdmin, async (req, res) => {
   const { title, category, price, stock, description } = req.body;
   if (!title || !category || price === undefined || price === null || isNaN(Number(price))) {
     return res.status(400).json({ error: 'Title, category, and a numeric price are required' });
   }
 
-  const products = readJSON(PRODUCTS_FILE);
+  const products = await readJSON(PRODUCTS_FILE);
   let id = slugify(title);
   let suffix = 1;
   while (products.find(p => p.id === id)) { id = `${slugify(title)}-${suffix++}`; }
@@ -917,12 +929,12 @@ app.post('/api/admin/products', requireAdmin, (req, res) => {
     benefits: req.body.benefits || ''
   };
   products.push(newProduct);
-  writeJSON(PRODUCTS_FILE, products);
+  await writeJSON(PRODUCTS_FILE, products);
   res.json({ success: true, product: newProduct });
 });
 
-app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
-  const products = readJSON(PRODUCTS_FILE);
+app.put('/api/admin/products/:id', requireAdmin, async (req, res) => {
+  const products = await readJSON(PRODUCTS_FILE);
   const idx = products.findIndex(p => p.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Not found' });
 
@@ -938,17 +950,30 @@ app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
   body.bestseller = !!body.bestseller;
 
   products[idx] = { ...products[idx], ...body };
-  writeJSON(PRODUCTS_FILE, products);
+  await writeJSON(PRODUCTS_FILE, products);
   res.json({ success: true, product: products[idx] });
 });
 
-app.delete('/api/admin/products/:id', requireAdmin, (req, res) => {
-  let products = readJSON(PRODUCTS_FILE);
+app.delete('/api/admin/products/:id', requireAdmin, async (req, res) => {
+  let products = await readJSON(PRODUCTS_FILE);
   products = products.filter(p => p.id !== req.params.id);
-  writeJSON(PRODUCTS_FILE, products);
+  await writeJSON(PRODUCTS_FILE, products);
   res.json({ success: true });
 });
 
-app.listen(PORT, () => {
-  console.log(`Natrio Organics store running at http://localhost:${PORT}`);
-});
+async function start() {
+  try {
+    await mongoClient.connect();
+    db = mongoClient.db(); // uses the database name from the connection string
+    console.log('Connected to MongoDB.');
+  } catch (err) {
+    console.error('Failed to connect to MongoDB. Check MONGODB_URI.', err.message);
+    process.exit(1);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Natrio Organics store running at http://localhost:${PORT}`);
+  });
+}
+
+start();
