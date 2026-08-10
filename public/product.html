@@ -9,36 +9,182 @@
   <link rel="apple-touch-icon" href="/images/favicon-180.png">
   <link rel="stylesheet" href="/style.css">
   <style>
-    .pd-layout { display:grid; grid-template-columns:1fr 1fr; gap:50px; max-width:var(--max); margin:0 auto; padding:40px 24px 80px; }
-    @media (max-width:760px){ .pd-layout{ grid-template-columns:1fr; } }
-    .pd-image { aspect-ratio:1/1; background:var(--cream-deep); display:flex; align-items:center; justify-content:center; }
-    .pd-image .placeholder { font-family:'Fraunces',serif; color:var(--olive); opacity:.3; font-size:20px; }
-    .pd-price { font-size:22px; color:var(--olive-dark); font-weight:600; margin:10px 0 20px; }
-    .variant-select { margin-bottom:20px; }
-    .pd-desc { color:#555; margin-bottom:26px; }
-    .qty-row { display:flex; align-items:center; gap:16px; margin-bottom:22px; }
+    .breadcrumb { max-width: var(--max); margin: 0 auto; padding: 20px 24px 0; font-size: 13px; color: var(--muted); }
+    .breadcrumb a { color: var(--muted); }
+    .breadcrumb a:hover { color: var(--olive); }
+    .breadcrumb .sep { margin: 0 6px; }
+    .breadcrumb .current { color: var(--ink); }
+
+    .pd-layout { display:grid; grid-template-columns:1fr 1fr; gap:56px; max-width:var(--max); margin:0 auto; padding:24px 24px 60px; }
+    @media (max-width:760px){ .pd-layout{ grid-template-columns:1fr; gap:28px; padding:16px 16px 40px;} }
+
+    .pd-gallery-main { aspect-ratio:1/1; background:var(--cream-deep); display:flex; align-items:center; justify-content:center; overflow:hidden; margin-bottom:12px; }
+    .pd-gallery-main img { width:100%; height:100%; object-fit:cover; }
+    .pd-gallery-main .placeholder { font-family:'Fraunces',serif; color:var(--olive); opacity:.3; font-size:20px; }
+    .pd-thumbs { display:flex; gap:10px; }
+    .pd-thumb { width:72px; height:72px; border:1px solid var(--line); cursor:pointer; overflow:hidden; background: var(--cream-deep); flex-shrink:0; }
+    .pd-thumb img { width:100%; height:100%; object-fit:cover; }
+    .pd-thumb.active { border-color: var(--olive); }
+
+    .pd-title { font-size: 30px; margin-bottom: 10px; }
+    .pd-meta { font-size: 13px; color: var(--muted); margin-bottom: 18px; line-height: 1.9; }
+    .pd-meta strong { color: var(--ink); font-weight: 500; }
+    .pd-desc { color: var(--muted); margin-bottom: 22px; }
+    .pd-price { font-size: 24px; color: var(--olive-dark); font-weight: 600; margin-bottom: 6px; }
+    .stock-note { font-size: 13px; margin-bottom: 20px; }
+    .stock-note.low { color: #a3701f; }
+    .stock-note.ok { color: var(--olive); }
+    .stock-note.out { color: #a33; }
+
+    .variant-select { margin-bottom: 18px; }
+    .qty-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+    .qty-row label { margin-bottom: 0; }
+
+    .pd-actions { display: flex; gap: 10px; margin-bottom: 14px; }
+    .pd-actions .btn-primary { flex: 1; }
+    .icon-square {
+      width: 48px; height: 48px; border: 1px solid var(--line); background: var(--white);
+      display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
+      font-size: 16px;
+    }
+    .icon-square:hover { border-color: var(--olive); color: var(--olive); }
+    .icon-square.active { border-color: var(--rose); color: var(--rose); }
+
+    .pd-links { display: flex; gap: 24px; font-size: 13px; margin: 18px 0 24px; }
+    .pd-links span { border-bottom: 1px solid var(--line); padding-bottom: 2px; cursor: default; color: var(--muted); }
+
+    .pd-info-rows { border-top: 1px solid var(--line); padding-top: 18px; }
+    .pd-info-row { display: flex; gap: 12px; margin-bottom: 14px; font-size: 13px; }
+    .pd-info-row .ic { font-size: 16px; }
+    .pd-info-row .txt strong { display: block; font-size: 13.5px; margin-bottom: 2px; }
+    .pd-info-row .txt span { color: var(--muted); }
+
+    /* tabs */
+    .pd-tabs-section { max-width: var(--max); margin: 0 auto; padding: 0 24px 60px; }
+    .pd-tabs { display: flex; gap: 30px; border-bottom: 1px solid var(--line); margin-bottom: 26px; overflow-x: auto; }
+    .pd-tab { padding: 10px 2px; font-size: 14px; color: var(--muted); cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; }
+    .pd-tab.active { color: var(--olive); border-bottom-color: var(--olive); font-weight: 500; }
+    .pd-tab-panel { display: none; color: var(--muted); line-height: 1.8; font-size: 14.5px; max-width: 760px; }
+    .pd-tab-panel.active { display: block; }
+
+    /* related */
+    .related-section { padding: 0 0 70px; }
+
+    /* sticky mobile add-to-cart */
+    .sticky-atc {
+      display: none;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 80;
+      background: var(--white); border-top: 1px solid var(--line);
+      padding: 12px 16px; align-items: center; gap: 12px;
+      box-shadow: 0 -6px 16px rgba(0,0,0,.06);
+    }
+    .sticky-atc img { width: 44px; height: 44px; object-fit: cover; flex-shrink: 0; background: var(--cream-deep); }
+    .sticky-atc .info { flex: 1; min-width: 0; }
+    .sticky-atc .info .t { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sticky-atc .info .p { font-size: 13px; font-weight: 600; color: var(--olive-dark); }
+    .sticky-atc button { flex-shrink: 0; }
+
+    @media (max-width: 760px) {
+      .sticky-atc.show { display: flex; }
+      body { padding-bottom: 0; }
+    }
   </style>
 </head>
 <body>
+
+  <div class="breadcrumb" id="breadcrumb"></div>
   <div class="pd-layout" id="pd">Loading…</div>
+
+  <div class="pd-tabs-section" id="tabsSection" style="display:none;">
+    <div class="pd-tabs">
+      <div class="pd-tab active" data-tab="description">Description</div>
+      <div class="pd-tab" data-tab="shipping">Shipping &amp; Returns</div>
+      <div class="pd-tab" data-tab="howto">How To Use</div>
+    </div>
+    <div class="pd-tab-panel active" id="panel-description"></div>
+    <div class="pd-tab-panel" id="panel-shipping">
+      <p>Orders are dispatched within 1–2 business days. Free shipping on all orders over Rs. 2500 — a flat Rs. 200 shipping fee applies below that. Cash on Delivery is available nationwide.</p>
+      <p>If you're not happy with your order, reach out within 15 days for an exchange. See our full Shipping &amp; Return Policy for details.</p>
+    </div>
+    <div class="pd-tab-panel" id="panel-howto">
+      <p>For best results, apply a small amount to clean skin or scalp and massage gently. Use consistently as part of your daily routine for visible results over time.</p>
+    </div>
+  </div>
+
+  <section class="related-section">
+    <div class="section-header">
+      <span class="eyebrow">You May Also Like</span>
+      <h2>Related Products</h2>
+    </div>
+    <div class="slider-row" id="relatedSlider"></div>
+    <div class="slider-controls">
+      <button onclick="scrollSlider('relatedSlider', -1)" aria-label="Previous">&larr;</button>
+      <button onclick="scrollSlider('relatedSlider', 1)" aria-label="Next">&rarr;</button>
+    </div>
+  </section>
+
+  <div class="sticky-atc" id="stickyAtc">
+    <img id="stickyImg" src="" alt="">
+    <div class="info">
+      <div class="t" id="stickyTitle"></div>
+      <div class="p" id="stickyPrice"></div>
+    </div>
+    <button class="btn btn-primary" id="stickyAddBtn">Add to Cart</button>
+  </div>
 
   <script src="/script.js"></script>
   <script>
     const id = new URLSearchParams(location.search).get('id');
+    let currentProduct = null;
+
     fetch(`/api/products/${id}`).then(r => r.json()).then(p => {
       if (p.error) {
         document.getElementById('pd').innerHTML = `<div class="empty-state">Product not found.</div>`;
         return;
       }
+      currentProduct = p;
+
+      // breadcrumb
+      document.getElementById('breadcrumb').innerHTML = `
+        <a href="/">Home</a><span class="sep">/</span>
+        <a href="/products.html?category=${encodeURIComponent(p.category)}">${p.category}</a><span class="sep">/</span>
+        <span class="current">${p.title}</span>
+      `;
+
+      const gallery = [p.image, p.hoverImage].filter(Boolean);
+      const stockNote = p.stock === 0
+        ? `<div class="stock-note out">Out of stock</div>`
+        : p.stock <= 15
+          ? `<div class="stock-note low">Only ${p.stock} left in stock — order soon</div>`
+          : `<div class="stock-note ok">In stock, ready to ship</div>`;
+
       document.getElementById('pd').innerHTML = `
-        <div class="pd-image">
-          ${p.image ? `<img src="${p.image}" alt="${p.title}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<span class=placeholder>${p.title}</span>'">` : `<span class="placeholder">${p.title}</span>`}
-        </div>
         <div>
-          <span class="category" style="color:var(--gold);font-size:12px;letter-spacing:.1em;text-transform:uppercase;">${p.category}</span>
-          <h1>${p.title}</h1>
-          <div class="pd-price">${money(p.price)}</div>
+          <div class="pd-gallery-main" id="galleryMain">
+            ${gallery[0]
+              ? `<img src="${gallery[0]}" alt="${p.title}" id="galleryMainImg" onerror="this.parentElement.innerHTML='<span class=placeholder>${p.title}</span>'">`
+              : `<span class="placeholder">${p.title}</span>`}
+          </div>
+          ${gallery.length > 1 ? `
+            <div class="pd-thumbs" id="pdThumbs">
+              ${gallery.map((src, i) => `<div class="pd-thumb ${i === 0 ? 'active' : ''}" data-src="${src}"><img src="${src}" alt=""></div>`).join('')}
+            </div>` : ''}
+        </div>
+
+        <div>
+          <span class="category ${p.category === 'Facial Care' ? 'rose' : ''}" style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;">${p.category}</span>
+          <h1 class="pd-title">${p.title}</h1>
+
+          <div class="pd-meta">
+            <strong>Vendor:</strong> Natrio Organics<br>
+            <strong>Availability:</strong> ${p.stock > 0 ? 'In Stock' : 'Out of Stock'}<br>
+            <strong>Category:</strong> ${p.category}
+          </div>
+
           <p class="pd-desc">${p.description}</p>
+
+          <div class="pd-price">${money(p.price)}</div>
+          ${stockNote}
 
           <div class="variant-select">
             <label>Size</label>
@@ -48,7 +194,7 @@
           </div>
 
           <div class="qty-row">
-            <label style="margin-bottom:0;">Quantity</label>
+            <label>Quantity</label>
             <div class="qty-control">
               <button onclick="document.getElementById('qty').stepDown()">−</button>
               <input id="qty" type="number" value="1" min="1">
@@ -56,15 +202,119 @@
             </div>
           </div>
 
-          <button class="btn btn-primary btn-full" id="addBtn">Add to Cart — ${money(p.price)}</button>
+          <div class="pd-actions">
+            <button class="btn btn-primary" id="addBtn" ${p.stock === 0 ? 'disabled' : ''}>
+              ${p.stock === 0 ? 'Out of Stock' : `Add to Cart — ${money(p.price)}`}
+            </button>
+            <div class="icon-square" id="wishlistBtn" title="Save for later">♡</div>
+            <div class="icon-square" id="shareBtn" title="Share">⤴</div>
+          </div>
+
+          <div class="pd-info-rows">
+            <div class="pd-info-row"><span class="ic">🚚</span><div class="txt"><strong>Free shipping over Rs. 2500</strong><span>Cash on Delivery available nationwide</span></div></div>
+            <div class="pd-info-row"><span class="ic">↩️</span><div class="txt"><strong>15-day exchange window</strong><span>Easy returns if something's not right</span></div></div>
+            <div class="pd-info-row"><span class="ic">🌿</span><div class="txt"><strong>Cold-pressed, chemical free</strong><span>Made in small batches for freshness</span></div></div>
+          </div>
         </div>
       `;
-      document.getElementById('addBtn').addEventListener('click', async function() {
+
+      // description tab content
+      document.getElementById('panel-description').innerHTML = `<p>${p.description}</p>`;
+      document.getElementById('tabsSection').style.display = 'block';
+
+      // thumbnail swap
+      document.querySelectorAll('.pd-thumb').forEach(thumb => {
+        thumb.addEventListener('click', () => {
+          document.querySelectorAll('.pd-thumb').forEach(t => t.classList.remove('active'));
+          thumb.classList.add('active');
+          document.getElementById('galleryMainImg').src = thumb.dataset.src;
+        });
+      });
+
+      // add to cart
+      const addBtn = document.getElementById('addBtn');
+      if (addBtn) {
+        addBtn.addEventListener('click', async function() {
+          const variant = document.getElementById('variant').value;
+          const qty = parseInt(document.getElementById('qty').value) || 1;
+          await addToCart(p.id, variant, qty);
+          const original = this.textContent;
+          this.textContent = 'Added to cart ✓';
+          setTimeout(() => { this.textContent = original; }, 1500);
+        });
+      }
+
+      // wishlist (local, non-persistent placeholder)
+      document.getElementById('wishlistBtn').addEventListener('click', function() {
+        this.classList.toggle('active');
+        this.textContent = this.classList.contains('active') ? '♥' : '♡';
+      });
+
+      // share
+      document.getElementById('shareBtn').addEventListener('click', async function() {
+        const shareData = { title: p.title, text: p.title, url: location.href };
+        if (navigator.share) {
+          try { await navigator.share(shareData); } catch (e) {}
+        } else {
+          await navigator.clipboard.writeText(location.href);
+          const original = this.textContent;
+          this.textContent = '✓';
+          setTimeout(() => { this.textContent = original; }, 1200);
+        }
+      });
+
+      // sticky mobile add-to-cart bar
+      const sticky = document.getElementById('stickyAtc');
+      document.getElementById('stickyImg').src = gallery[0] || '';
+      document.getElementById('stickyTitle').textContent = p.title;
+      document.getElementById('stickyPrice').textContent = money(p.price);
+      document.getElementById('stickyAddBtn').addEventListener('click', async () => {
         const variant = document.getElementById('variant').value;
         const qty = parseInt(document.getElementById('qty').value) || 1;
         await addToCart(p.id, variant, qty);
-        this.textContent = 'Added to cart ✓';
-        setTimeout(() => { this.textContent = `Add to Cart — ${money(p.price)}`; }, 1500);
+        const btn = document.getElementById('stickyAddBtn');
+        const original = btn.textContent;
+        btn.textContent = 'Added ✓';
+        setTimeout(() => { btn.textContent = original; }, 1200);
+      });
+      if (p.stock > 0) {
+        const mainActions = document.querySelector('.pd-actions');
+        const observer = new IntersectionObserver(([entry]) => {
+          sticky.classList.toggle('show', !entry.isIntersecting);
+        }, { threshold: 0 });
+        observer.observe(mainActions);
+      }
+
+      // related products
+      fetch(`/api/products?category=${encodeURIComponent(p.category)}`).then(r => r.json()).then(list => {
+        const related = list.filter(rp => rp.id !== p.id);
+        document.getElementById('relatedSlider').innerHTML = related.map(rp => `
+          <div class="product-card">
+            <a href="/product.html?id=${rp.id}">
+              <div class="thumb">
+                ${rp.image
+                  ? `<img class="img-main" src="${rp.image}" alt="${rp.title}" onerror="this.parentElement.innerHTML='<span class=placeholder>${rp.title}</span>'">${rp.hoverImage ? `<img class="img-alt" src="${rp.hoverImage}" alt="" onerror="this.remove()">` : ''}`
+                  : `<span class="placeholder">${rp.title}</span>`}
+              </div>
+            </a>
+            <div class="body">
+              <span class="category ${rp.category === 'Facial Care' ? 'rose' : ''}">${rp.category}</span>
+              <h3><a href="/product.html?id=${rp.id}">${rp.title}</a></h3>
+              <div class="price">${money(rp.price)}</div>
+              <button class="add-btn" onclick="addToCart('${rp.id}','${rp.variants[0]}',1).then(()=>this.textContent='Added ✓')">Add to Cart</button>
+            </div>
+          </div>
+        `).join('') || '<p style="color:var(--muted);padding:0 24px;">No related products yet.</p>';
+      });
+
+      // tab switching
+      document.querySelectorAll('.pd-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.pd-tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.pd-tab-panel').forEach(pnl => pnl.classList.remove('active'));
+          tab.classList.add('active');
+          document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
+        });
       });
     });
   </script>

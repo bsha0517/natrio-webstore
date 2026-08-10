@@ -14,8 +14,10 @@ function renderHeader() {
           <a href="/products.html?category=Hair%20Oils">Hair Oils</a>
           <a href="/products.html?category=Facial%20Care">Facial Care</a>
           <a href="/products.html">All Products</a>
+          <a href="/account.html" id="mobileAccountLink" class="mobile-only-link">My Account</a>
         </nav>
         <div class="header-actions">
+          <a href="#" class="icon-btn" id="accountLink" aria-label="Account">👤</a>
           <a href="/cart.html" class="icon-btn" aria-label="Cart">
             🛒<span class="cart-count" id="cartCount">0</span>
           </a>
@@ -30,6 +32,26 @@ function renderHeader() {
     nav.classList.toggle('open');
     toggle.classList.toggle('open');
   });
+
+  refreshAccountLink();
+}
+
+async function refreshAccountLink() {
+  try {
+    const res = await fetch('/api/auth/me');
+    const data = await res.json();
+    const link = document.getElementById('accountLink');
+    const mobileLink = document.getElementById('mobileAccountLink');
+    const href = data.user ? '/account.html' : '/login.html';
+    const title = data.user ? `Hi, ${data.user.name.split(' ')[0]}` : 'Log in';
+    const mobileText = data.user ? 'My Account' : 'Log In / Sign Up';
+    link.href = href;
+    link.title = title;
+    if (mobileLink) {
+      mobileLink.href = href;
+      mobileLink.textContent = mobileText;
+    }
+  } catch (e) { /* noop */ }
 }
 
 function renderFooter() {

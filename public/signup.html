@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create Account — Natrio Organics</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
+  <link rel="apple-touch-icon" href="/images/favicon-180.png">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .auth-box { max-width: 400px; margin: 60px auto 90px; background: var(--white); border: 1px solid var(--line); padding: 34px; }
+    .auth-box h1 { font-size: 26px; text-align: center; margin-bottom: 6px; }
+    .auth-box .sub { text-align: center; color: var(--muted); font-size: 14px; margin-bottom: 26px; }
+    .auth-box label { margin-top: 14px; }
+    .auth-box label:first-of-type { margin-top: 0; }
+    .auth-error { color: #a33; font-size: 13px; margin-top: 12px; display: none; }
+    .auth-switch { text-align: center; font-size: 14px; margin-top: 20px; color: var(--muted); }
+    .auth-switch a { color: var(--olive); border-bottom: 1px solid var(--olive); }
+  </style>
+</head>
+<body>
+
+  <div class="auth-box">
+    <h1>Create your account</h1>
+    <p class="sub">Sign up to track orders and check out faster</p>
+    <form id="signupForm">
+      <label>Full Name</label>
+      <input name="name" required>
+      <label>Email Address</label>
+      <input name="email" type="email" required>
+      <label>Password</label>
+      <input name="password" type="password" required minlength="6" placeholder="At least 6 characters">
+      <button type="submit" class="btn btn-primary btn-full" style="margin-top:22px;">Create Account</button>
+      <p class="auth-error" id="authError"></p>
+    </form>
+    <p class="auth-switch">Already have an account? <a href="/login.html">Log in</a></p>
+  </div>
+
+  <script src="/script.js"></script>
+  <script>
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const btn = e.target.querySelector('button');
+      btn.disabled = true; btn.textContent = 'Creating account…';
+
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.error) {
+        const err = document.getElementById('authError');
+        err.textContent = data.error;
+        err.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Create Account';
+        return;
+      }
+      location.href = '/account.html';
+    });
+  </script>
+</body>
+</html>

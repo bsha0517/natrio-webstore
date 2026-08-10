@@ -5,10 +5,11 @@ platform fees. Full control over your data, design, and checkout flow.
 
 ## What's included
 - Homepage, product listing, product detail, cart, checkout, order confirmation
+- Customer accounts: sign up / log in / log out, with order history and a visual order-status tracker at `/account.html`
 - Server-side cart (session based) and orders saved to `data/orders.json`
 - Cash on Delivery checkout working out of the box
 - Placeholder options for Card / JazzCash / Easypaisa (need merchant setup — see below)
-- Simple password-protected admin page at `/admin.html` to view orders
+- Admin panel at `/admin.html` (password-protected) to view/update orders, manage the homepage hero slider, and manage category cards
 
 ## 1. Run it locally (to preview before going live)
 
@@ -49,12 +50,34 @@ Open `data/products.json` in any text editor. Each product looks like:
 Add a new product by copying an existing block and giving it a unique `id`.
 Restart the server (`npm start`) after editing.
 
-## 4. View orders
+## 4. Customer accounts & order tracking
+
+- Shoppers create an account at `/signup.html` and log in at `/login.html`.
+- Logged-in shoppers see their name/email pre-filled at checkout, and every
+  order they place is linked to their account automatically.
+- `/account.html` shows their order history with a visual tracker (pending →
+  processing → shipped → delivered).
+- Passwords are hashed with Node's built-in `crypto` module (scrypt) — never
+  stored in plain text. User accounts live in `data/users.json`.
+- You update an order's status from `/admin.html` → **Orders** tab → the
+  status dropdown on each row. The customer sees the update immediately next
+  time they open their account page.
+
+## 5. Managing categories
+
+Go to `/admin.html` → **Categories** tab to add, edit, or remove the small
+category cards shown on the homepage. Each needs a title and an image path
+(upload the photo to `public/images/` first). The category title should
+match the `category` field used in `data/products.json` exactly (e.g.
+`Hair Oils`), or the "Shop more" link on that card won't show matching
+products.
+
+## 6. View orders (admin)
 
 Go to **/admin.html**, log in with the password set in `ADMIN_PASSWORD`
-(default: `natrio-admin-2026` — **change this before going live**, see step 6).
+(default: `natrio-admin-2026` — **change this before going live**, see step 8).
 
-## 5. Deploying to Render.com (recommended)
+## 7. Deploying to Render.com (recommended)
 
 Render runs your app as a normal, always-on Node.js server — not a
 serverless function — so this project works there with **no code changes**.
@@ -95,14 +118,14 @@ cart sessions in memory the way this project expects — that's what caused
 the `FUNCTION_INVOCATION_FAILED` error. Render (and Railway) don't have
 this limitation.
 
-## 6. Before going live — security checklist
+## 8. Before going live — security checklist
 
 - [ ] Change `ADMIN_PASSWORD` (set as an environment variable, don't hardcode)
 - [ ] Change `SESSION_SECRET` to a long random string
 - [ ] Set up HTTPS (Railway/Render provide this automatically; a VPS needs Let's Encrypt/Certbot)
-- [ ] Back up `data/orders.json` and `data/products.json` regularly
+- [ ] Back up `data/orders.json`, `data/products.json`, and `data/users.json` regularly — `users.json` holds hashed customer passwords, so treat it as sensitive
 
-## 7. Payments — going beyond Cash on Delivery
+## 9. Payments — going beyond Cash on Delivery
 
 Cash on Delivery works immediately with no setup. For card / JazzCash /
 Easypaisa, you need a merchant account with that provider, then wire their
@@ -119,7 +142,7 @@ This is genuinely the part of the project that benefits most from a
 developer's help for a few hours — payment integrations involve handling
 webhooks and verifying signatures correctly for security.
 
-## 8. Project structure
+## 10. Project structure
 
 ```
 natrio-store/
@@ -139,7 +162,7 @@ natrio-store/
     script.js                       → shared header/footer + cart logic
 ```
 
-## 9. Customizing the look
+## 11. Customizing the look
 
 All colors, fonts, and spacing live in `public/style.css` at the top under
 `:root { ... }`. Change `--olive`, `--gold`, `--cream` to shift the palette

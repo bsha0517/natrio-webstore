@@ -68,7 +68,7 @@
             </div>
           </a>
           <div class="body">
-            <span class="category">${p.category}</span>
+            <span class="category ${p.category === 'Facial Care' ? 'rose' : ''}">${p.category}</span>
             <h3><a href="/product.html?id=${p.id}">${p.title}</a></h3>
             <div class="price">${money(p.price)}</div>
             <button class="add-btn" onclick="addToCart('${p.id}','${p.variants[0]}',1).then(()=>this.textContent='Added ✓')">Add to Cart</button>
@@ -85,7 +85,8 @@
     // Categories
     fetch('/api/categories').then(r => r.json()).then(list => {
       document.getElementById('categoryStrip').innerHTML = list.map(c => `
-        <a class="category-tile" href="${c.url}" style="background-image:url('${c.image}')">
+        <a class="category-tile" href="${c.url}">
+          <div class="cat-thumb" style="background-image:url('${c.image}')"></div>
           <span class="cat-label">${c.title}</span>
         </a>
       `).join('');
