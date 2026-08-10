@@ -42,7 +42,11 @@
       <span class="eyebrow">Guides</span>
       <h2>Natural Hair &amp; Skin Care Guides</h2>
     </div>
-    <div class="blog-grid" id="blogGrid"></div>
+    <div class="slider-row" id="blogSlider"></div>
+    <div class="slider-controls" id="blogSliderControls">
+      <button onclick="scrollSlider('blogSlider', -1)" aria-label="Previous">&larr;</button>
+      <button onclick="scrollSlider('blogSlider', 1)" aria-label="Next">&rarr;</button>
+    </div>
   </section>
 
   <!-- TRUST / SERVICE ICONS -->
@@ -126,21 +130,24 @@
 
     // Blog
     fetch('/api/blog').then(r => r.json()).then(list => {
-      const grid = document.getElementById('blogGrid');
+      const slider = document.getElementById('blogSlider');
       if (!list.length) {
-        grid.closest('section').style.display = 'none';
+        slider.closest('section').style.display = 'none';
         return;
       }
-      grid.innerHTML = list.slice(0, 3).map(b => `
-        <div class="blog-card">
-          <a href="/blog-post.html?slug=${b.slug}"><div class="thumb">${b.image ? `<img src="${b.image}" alt="${b.title}" onerror="this.parentElement.style.background='var(--cream-deep)';this.remove()">` : ''}</div></a>
+      slider.innerHTML = list.slice(0, 4).map(b => `
+        <div class="product-card">
+          <a href="/blog-post.html?slug=${b.slug}">
+            <div class="thumb">${b.image ? `<img class="img-main" src="${b.image}" alt="${b.title}" onerror="this.parentElement.style.background='var(--cream-deep)';this.remove()">` : ''}</div>
+          </a>
           <div class="body">
             <h3><a href="/blog-post.html?slug=${b.slug}">${b.title}</a></h3>
-            <p>${b.excerpt || ''}</p>
-            <a class="read-more" href="/blog-post.html?slug=${b.slug}">Read more</a>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.6;">${b.excerpt || ''}</p>
+            <a class="read-more" href="/blog-post.html?slug=${b.slug}" style="font-size:13px;color:var(--olive);border-bottom:1px solid var(--olive);padding-bottom:2px;">Read more</a>
           </div>
         </div>
       `).join('');
+      if (list.length <= 2) document.getElementById('blogSliderControls').style.display = 'none';
     });
 
     // Instagram strip — reuses product photography until real Instagram photos are added
