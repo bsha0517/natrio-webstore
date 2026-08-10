@@ -204,17 +204,23 @@
       const slidesEl = document.getElementById('heroSlides');
       const dotsEl = document.getElementById('heroDots');
 
-      slidesEl.innerHTML = slides.map((s, i) => `
+      slidesEl.innerHTML = slides.map((s, i) => {
+        const hasText = s.eyebrow || s.heading || s.subtext || s.buttonText;
+        return `
         <div class="hero-slide ${i === 0 ? 'active' : ''}" data-index="${i}">
-          <div class="hero-bg" style="background-image:url('${s.image}')"></div>
-          <div class="hero-inner">
-            ${s.eyebrow ? `<span class="eyebrow">${s.eyebrow}</span>` : ''}
-            <h1>${s.heading || ''}</h1>
-            ${s.subtext ? `<p>${s.subtext}</p>` : ''}
-            ${s.buttonText ? `<a href="${s.buttonUrl || '/products.html'}" class="btn btn-primary">${s.buttonText}</a>` : ''}
-          </div>
+          <img class="hero-slide-img" src="${s.image}" alt="${s.heading || 'Natrio Organics'}">
+          ${hasText ? `
+          <div class="hero-slide-text">
+            <div class="hero-inner">
+              ${s.eyebrow ? `<span class="eyebrow">${s.eyebrow}</span>` : ''}
+              ${s.heading ? `<h1>${s.heading}</h1>` : ''}
+              ${s.subtext ? `<p>${s.subtext}</p>` : ''}
+              ${s.buttonText ? `<a href="${s.buttonUrl || '/products.html'}" class="btn btn-primary">${s.buttonText}</a>` : ''}
+            </div>
+          </div>` : ''}
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       if (slides.length > 1) {
         dotsEl.innerHTML = slides.map((_, i) => `<button class="hero-dot ${i === 0 ? 'active' : ''}" data-index="${i}"></button>`).join('');

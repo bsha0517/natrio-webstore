@@ -106,27 +106,24 @@ nav.main-nav a:hover { color: var(--olive-dark); }
 /* ---------- Hero ---------- */
 .hero {
   position: relative;
-  min-height: 560px;
   overflow: hidden;
-  background: var(--olive-dark);
-  color: var(--cream);
+  background: var(--cream-deep);
 }
 .hero-slide {
-  position: absolute; inset: 0;
+  display: none;
+  position: relative;
+}
+.hero-slide.active { display: block; }
+.hero-slide-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.hero-slide-text {
+  position: absolute; inset: 0; z-index: 2;
   display: flex; align-items: center;
-  opacity: 0; visibility: hidden;
-  transition: opacity .7s ease;
-}
-.hero-slide.active { opacity: 1; visibility: visible; position: relative; }
-.hero .hero-bg {
-  position: absolute; inset: 0;
-  background-size: cover; background-position: center;
-  opacity: .55;
-}
-.hero-slide::after {
-  content: "";
-  position: absolute; inset: 0;
   background: linear-gradient(90deg, rgba(24,29,20,.72) 0%, rgba(24,29,20,.25) 60%, rgba(24,29,20,.05) 100%);
+  color: var(--cream);
 }
 .hero-inner { position: relative; z-index: 2; max-width: 520px; padding: 0 24px; margin: 0 6%; }
 .hero .eyebrow {
@@ -537,7 +534,6 @@ textarea { resize: vertical; min-height: 70px; }
   .announce { font-size: 11px; padding: 7px 10px; }
 
   /* hero */
-  .hero { min-height: 420px; }
   .hero-inner { margin: 0 20px; max-width: 90%; }
   .hero h1 { font-size: 28px; }
   .hero p { font-size: 15px; }

@@ -38,6 +38,40 @@
     }
     .modal-close:hover { color: var(--ink); }
     #orderModal.hidden { display: none !important; }
+
+    /* ---------- Mobile responsiveness ---------- */
+    @media (max-width: 760px) {
+      .admin-wrap { padding: 24px 16px 60px; }
+      .login-box { margin: 60px auto; max-width: 90%; padding: 24px; }
+
+      h1 { font-size: 24px; }
+
+      /* tabs scroll sideways instead of wrapping/overflowing the page */
+      .tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        gap: 16px;
+        padding-bottom: 2px;
+        -webkit-overflow-scrolling: touch;
+      }
+      .tab { white-space: nowrap; flex-shrink: 0; font-size: 14px; }
+
+      /* tables scroll sideways instead of squeezing/breaking the layout */
+      table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+      th, td { font-size: 13px; padding: 8px 10px; }
+
+      /* stacked forms and editor boxes */
+      div[style*="display:flex"][style*="gap:24px"] { flex-wrap: wrap; }
+
+      /* modal */
+      .modal-overlay { padding: 16px; }
+      .modal-box { padding: 20px; }
+      .modal-box h2 { font-size: 20px; }
+
+      /* seed import banner */
+      #seedImportBox button { display: block; margin: 10px 0 0 !important; }
+      #seedImportBox span { display: block; margin-top: 8px; }
+    }
   </style>
 </head>
 <body>
@@ -244,7 +278,7 @@
     </div>
 
     <div id="heroTab" class="hidden">
-      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Add up to 3 hero slides. Each needs an image path (upload the photo to <code>public/images/</code> first, then reference it here, e.g. <code>/images/hero-2.jpg</code>). Slides rotate automatically every 6 seconds on the homepage.</p>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Add up to 3 hero slides. Only the image is required — the picture always displays at full size, uncropped. Heading, subtext, and button are all optional: leave them blank for a clean photo-only slide, or fill them in to overlay text on top. Slides rotate automatically every 6 seconds on the homepage.</p>
       <div id="heroSlideEditors"></div>
       <button class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);margin-top:10px;" onclick="addHeroSlide()" id="addSlideBtn">+ Add Slide</button>
       <button class="btn btn-primary" style="margin-top:10px;margin-left:10px;" onclick="saveHeroSlides()">Save Hero Slides</button>
@@ -1142,7 +1176,7 @@
           <div class="form-grid">
             <div class="full">
               <label>Image path</label>
-              <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: wide banner, 1920×800px</p>
+              <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: wide banner, around 1920×650px. The picture is never cropped — it always shows in full, so keep this roughly the same shape for a consistent look across slides.</p>
               <input id="heroImage${i}" value="${s.image || ''}" onchange="updateHeroField(${i},'image',this.value)" placeholder="/images/hero-1.jpg">
               <input type="file" accept="image/*" onchange="handleImageUpload(this, 'heroImage${i}')" style="margin-top:6px;font-size:12px;">
               <span id="heroImage${i}_status" style="font-size:12px;"></span>
