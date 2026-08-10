@@ -279,10 +279,13 @@ footer.site-footer.dark-footer {
   display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
   font-size: 13px; opacity: .7;
 }
-.payment-icons { display: flex; gap: 8px; }
+.payment-icons { display: flex; gap: 8px; flex-wrap: wrap; }
 .payment-icons span {
-  border: 1px solid rgba(255,255,255,.2); border-radius: 3px; padding: 3px 8px; font-size: 11px;
+  display: flex; align-items: center; gap: 5px;
+  border: 1px solid rgba(255,255,255,.2); border-radius: 3px; padding: 4px 9px; font-size: 11px;
+  color: rgba(255,255,255,.85);
 }
+.payment-icons span svg { flex-shrink: 0; opacity: .85; }
 
 .btn {
   display: inline-block;
