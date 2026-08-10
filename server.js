@@ -60,6 +60,59 @@ async function sendContactEmail(message) {
   }
 }
 
+function orderItemsText(order) {
+  return order.items.map(i => `  - ${i.title} (${i.variant}) x${i.qty} — Rs. ${i.price * i.qty}`).join('\n');
+}
+
+async function sendOrderConfirmationEmails(order) {
+  if (!mailTransporter) {
+    console.log('Email not configured — skipping order confirmation emails.');
+    return;
+  }
+  const itemsText = orderItemsText(order);
+  const summary = `Order #${order.id}\n\nItems:\n${itemsText}\n\nSubtotal: Rs. ${order.subtotal}\nShipping (${order.shippingMethod}): ${order.shipping === 0 ? 'Free' : 'Rs. ' + order.shipping}\nTotal: Rs. ${order.total}\n\nPayment method: ${order.paymentMethod.toUpperCase()}\n\nDelivery to:\n${order.customer.name}\n${order.customer.address}\n${order.customer.city}\nPhone: ${order.customer.phone}`;
+
+  // email to the customer, if they gave one
+  if (order.customer.email) {
+    try {
+      await mailTransporter.sendMail({
+        from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
+        to: order.customer.email,
+        subject: `Your Natrio Organics order #${order.id} is confirmed`,
+        text: `Hi ${order.customer.name.split(' ')[0]},\n\nThanks for your order! Here's a summary:\n\n${summary}\n\nWe'll email you again once it ships.\n\n— Natrio Organics`
+      });
+    } catch (err) {
+      console.error('Failed to send customer order confirmation email:', err.message);
+    }
+  }
+
+  // email to the store owner
+  try {
+    await mailTransporter.sendMail({
+      from: `"Natrio Organics Website" <${process.env.SMTP_USER}>`,
+      to: CONTACT_EMAIL,
+      subject: `New order #${order.id} — Rs. ${order.total}`,
+      text: `A new order was placed.\n\n${summary}\n\nCustomer email: ${order.customer.email || 'not provided'}`
+    });
+  } catch (err) {
+    console.error('Failed to send store owner order notification email:', err.message);
+  }
+}
+
+async function sendShippedEmail(order) {
+  if (!mailTransporter || !order.customer.email) return;
+  try {
+    await mailTransporter.sendMail({
+      from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
+      to: order.customer.email,
+      subject: `Your Natrio Organics order #${order.id} has shipped`,
+      text: `Hi ${order.customer.name.split(' ')[0]},\n\nGood news — your order #${order.id} is on its way!\n\n${orderItemsText(order)}\n\nDelivery to:\n${order.customer.address}\n${order.customer.city}\n\nExpected delivery: 1–3 business days.\n\n— Natrio Organics`
+    });
+  } catch (err) {
+    console.error('Failed to send shipped notification email:', err.message);
+  }
+}
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
@@ -327,6 +380,9 @@ app.post('/api/checkout', (req, res) => {
   // clear cart
   req.session.cart = [];
 
+  // send confirmation emails in the background — don't make the customer wait on this
+  sendOrderConfirmationEmails(order).catch(err => console.error('Order email error:', err.message));
+
   res.json({ success: true, orderId: order.id, total: order.total });
 });
 
@@ -434,6 +490,7 @@ app.put('/api/admin/orders/:id/status', requireAdmin, (req, res) => {
   if (!order) return res.status(404).json({ error: 'Order not found' });
 
   const wasCancelled = order.status === 'cancelled';
+  const wasShipped = order.status === 'shipped';
   order.status = status;
   if (!order.statusHistory) order.statusHistory = [];
   order.statusHistory.push({ status, date: new Date().toISOString() });
@@ -454,6 +511,11 @@ app.put('/api/admin/orders/:id/status', requireAdmin, (req, res) => {
       if (product) product.stock = Math.max(0, product.stock - item.qty);
     }
     writeJSON(PRODUCTS_FILE, products);
+  }
+
+  // notify the customer when their order ships
+  if (status === 'shipped' && !wasShipped) {
+    sendShippedEmail(order).catch(err => console.error('Shipped email error:', err.message));
   }
 
   res.json({ success: true, order });

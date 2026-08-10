@@ -11,7 +11,8 @@ platform fees. Full control over your data, design, and checkout flow.
 - Server-side cart (session based) and orders saved to `data/orders.json`
 - Cash on Delivery checkout working out of the box, with admin-editable shipping methods and rates
 - Placeholder options for Card / JazzCash / Easypaisa (need merchant setup — see below)
-- Admin panel at `/admin.html` (password-protected) to view/update orders, manage the homepage hero slider, categories, shipping methods, and view contact messages
+- Admin panel at `/admin.html` (password-protected) to view/update orders (click any row for full details), manage the homepage hero slider, categories, shipping methods, blog posts, and contact messages
+- Automatic emails for new orders (to both customer and store owner) and shipping notifications, once SMTP is configured
 
 ## 1. Run it locally (to preview before going live)
 
@@ -82,11 +83,26 @@ products.
 Go to **/admin.html**, log in with the password set in `ADMIN_PASSWORD`
 (default: `natrio-admin-2026` — **change this before going live**, see step 9).
 
-## 7. Contact form emails
+## 7. Email notifications
 
-The Contact Us page (`/contact-us.html`) saves every message to
-`data/messages.json` (viewable in `/admin.html` → **Messages** tab) and,
-if configured, also emails you directly using Gmail.
+The same SMTP setup below (step-by-step further down this section) powers
+three kinds of emails:
+
+- **Contact form** — the Contact Us page saves every message to
+  `data/messages.json` (viewable in `/admin.html` → **Messages** tab) and,
+  if configured, emails it to you directly.
+- **New order confirmation** — the moment a customer checks out, they get a
+  confirmation email with their order summary (if they gave an email
+  address), and you get a "new order" email at `CONTACT_EMAIL` with the same
+  details — so you never have to keep the admin panel open to know an order
+  came in.
+- **Shipped notification** — when you mark an order as **shipped** from
+  `/admin.html` → **Orders** tab, the customer automatically gets an email
+  letting them know.
+
+All of this is optional — if you skip the setup below, orders and messages
+are still saved normally, you'll just need to check the admin panel instead
+of your inbox.
 
 **To turn on email sending:**
 1. Use a Gmail account you're happy to send from (a dedicated one is fine).
@@ -98,12 +114,9 @@ if configured, also emails you directly using Gmail.
    below for how):
    - `SMTP_USER` — your Gmail address
    - `SMTP_PASS` — the app password from step 3 (not your normal Gmail password)
-5. Optionally set `CONTACT_EMAIL` to a different address if you want form
-   submissions sent somewhere other than `info@natrio.pk`.
-
-If you skip this setup, the contact form still works and messages are still
-saved — you'll just need to check the admin **Messages** tab instead of
-your inbox.
+5. Optionally set `CONTACT_EMAIL` to a different address if you want contact
+   form submissions and new-order alerts sent somewhere other than
+   `info@natrio.pk`.
 
 ## 8. Deploying to Render.com (recommended)
 

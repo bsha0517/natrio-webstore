@@ -21,6 +21,21 @@
     .hidden { display:none; }
     .status-pending { color: var(--gold); }
     .status-shipped { color: var(--olive); }
+    .order-row:hover { background: var(--cream-deep); }
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(24,29,20,.55);
+      display: flex; align-items: flex-start; justify-content: center;
+      padding: 40px 20px; z-index: 200; overflow-y: auto;
+    }
+    .modal-box {
+      background: white; max-width: 700px; width: 100%; padding: 32px;
+      position: relative; border-radius: 2px;
+    }
+    .modal-close {
+      position: absolute; top: 16px; right: 16px; background: none; border: none;
+      font-size: 24px; line-height: 1; cursor: pointer; color: var(--muted);
+    }
+    .modal-close:hover { color: var(--ink); }
   </style>
 </head>
 <body>
@@ -197,6 +212,13 @@
     </div>
   </div>
 
+  <div class="modal-overlay hidden" id="orderModal" onclick="if(event.target===this) closeOrderModal()">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeOrderModal()" aria-label="Close">&times;</button>
+      <div id="orderModalBody"></div>
+    </div>
+  </div>
+
   <script>
     function money(n) { return 'Rs. ' + Number(n).toLocaleString(); }
 
@@ -235,19 +257,21 @@
       });
     });
 
+    let allOrders = [];
+
     async function loadOrders() {
       const res = await fetch('/api/admin/orders');
-      const orders = await res.json();
+      allOrders = await res.json();
       const statuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
-      document.getElementById('ordersBody').innerHTML = orders.slice().reverse().map(o => `
-        <tr>
+      document.getElementById('ordersBody').innerHTML = allOrders.slice().reverse().map(o => `
+        <tr class="order-row" onclick="openOrderDetails('${o.id}')" style="cursor:pointer;">
           <td>#${o.id}</td>
           <td>${new Date(o.date).toLocaleDateString()}</td>
           <td>${o.customer.name}<br><span style="color:var(--muted);">${o.customer.phone}</span></td>
           <td>${o.items.map(i => `${i.title} ×${i.qty}`).join('<br>')}</td>
           <td>${money(o.total)}</td>
           <td>${o.paymentMethod.toUpperCase()}</td>
-          <td>
+          <td onclick="event.stopPropagation()">
             <select onchange="updateOrderStatus('${o.id}', this.value)">
               ${statuses.map(s => `<option value="${s}" ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}
             </select>
@@ -256,11 +280,78 @@
       `).join('') || '<tr><td colspan="7">No orders yet.</td></tr>';
     }
 
+    function openOrderDetails(id) {
+      const o = allOrders.find(x => x.id === id);
+      if (!o) return;
+      const statuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+      document.getElementById('orderModalBody').innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
+          <div>
+            <h2 style="margin-bottom:2px;">Order #${o.id}</h2>
+            <span style="color:var(--muted);font-size:13px;">${new Date(o.date).toLocaleString()}</span>
+          </div>
+          <select onchange="updateOrderStatus('${o.id}', this.value); this.closest('.modal-overlay').remove();" style="width:auto;">
+            ${statuses.map(s => `<option value="${s}" ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+          <div>
+            <h4 style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;">Customer</h4>
+            <p style="margin:0;font-size:14px;line-height:1.7;">
+              ${o.customer.name}<br>
+              ${o.customer.phone}<br>
+              ${o.customer.email || '—'}
+            </p>
+          </div>
+          <div>
+            <h4 style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;">Delivery Address</h4>
+            <p style="margin:0;font-size:14px;line-height:1.7;">
+              ${o.customer.address}<br>
+              ${o.customer.city}
+            </p>
+          </div>
+        </div>
+
+        <h4 style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;">Items</h4>
+        <table style="width:100%;margin-bottom:16px;">
+          <thead><tr><th>Product</th><th>Variant</th><th>Qty</th><th>Price</th></tr></thead>
+          <tbody>
+            ${o.items.map(i => `
+              <tr><td>${i.title}</td><td>${i.variant}</td><td>${i.qty}</td><td>${money(i.price * i.qty)}</td></tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div style="border-top:1px solid var(--line);padding-top:12px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;"><span>Subtotal</span><span>${money(o.subtotal)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;"><span>Shipping (${o.shippingMethod || '—'})</span><span>${o.shipping === 0 ? 'Free' : money(o.shipping)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:600;border-top:1px solid var(--line);padding-top:8px;"><span>Total</span><span>${money(o.total)}</span></div>
+        </div>
+
+        <p style="font-size:13px;color:var(--muted);"><strong>Payment method:</strong> ${o.paymentMethod.toUpperCase()}</p>
+        ${o.notes ? `<p style="font-size:13px;color:var(--muted);"><strong>Order notes:</strong> ${o.notes}</p>` : ''}
+
+        ${o.statusHistory && o.statusHistory.length ? `
+          <h4 style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:16px 0 8px;">Status History</h4>
+          <ul style="margin:0;padding-left:18px;font-size:13px;color:var(--muted);">
+            ${o.statusHistory.map(h => `<li>${h.status} — ${new Date(h.date).toLocaleString()}</li>`).join('')}
+          </ul>
+        ` : ''}
+      `;
+      document.getElementById('orderModal').classList.remove('hidden');
+    }
+
+    function closeOrderModal() {
+      document.getElementById('orderModal').classList.add('hidden');
+    }
+
     async function updateOrderStatus(id, status) {
       await fetch(`/api/admin/orders/${id}/status`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       });
+      loadOrders();
     }
 
     let allProducts = [];

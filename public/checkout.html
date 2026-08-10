@@ -32,10 +32,10 @@
 
         <h3 style="margin-top:26px;">Payment Method</h3>
         <div class="pay-options" id="payOptions">
-          <label class="pay-option selected"><input type="radio" name="paymentMethod" value="cod" checked style="margin:0;"> Cash on Delivery</label>
-          <label class="pay-option"><input type="radio" name="paymentMethod" value="card" style="margin:0;"> Credit / Debit Card (Stripe)</label>
-          <label class="pay-option"><input type="radio" name="paymentMethod" value="jazzcash" style="margin:0;"> JazzCash</label>
-          <label class="pay-option"><input type="radio" name="paymentMethod" value="easypaisa" style="margin:0;"> Easypaisa</label>
+          <label class="pay-option selected"><input type="radio" name="paymentMethod" value="cod" checked> <span class="opt-label">Cash on Delivery</span></label>
+          <label class="pay-option"><input type="radio" name="paymentMethod" value="card"> <span class="opt-label">Credit / Debit Card (Stripe)</span></label>
+          <label class="pay-option"><input type="radio" name="paymentMethod" value="jazzcash"> <span class="opt-label">JazzCash</span></label>
+          <label class="pay-option"><input type="radio" name="paymentMethod" value="easypaisa"> <span class="opt-label">Easypaisa</span></label>
         </div>
         <p style="font-size:12px;color:var(--muted);">Card / JazzCash / Easypaisa require a merchant account to go live — see the setup notes in the project README. Cash on Delivery works immediately.</p>
 
@@ -93,11 +93,9 @@
       selectedShippingId = shippingMethods[0].id;
       document.getElementById('shippingOptions').innerHTML = shippingMethods.map((m, i) => `
         <label class="pay-option ${i === 0 ? 'selected' : ''}" data-shipping-id="${m.id}">
-          <input type="radio" name="shippingMethodId" value="${m.id}" ${i === 0 ? 'checked' : ''} style="margin:0;">
-          <span style="flex:1;">
-            ${m.name}${m.description ? ` <span style="color:var(--muted);font-size:12px;">— ${m.description}</span>` : ''}
-          </span>
-          <span style="font-weight:500;">${shippingCostFor(m) === 0 ? 'Free' : money(m.cost)}</span>
+          <input type="radio" name="shippingMethodId" value="${m.id}" ${i === 0 ? 'checked' : ''}>
+          <span class="opt-label">${m.name}${m.description ? ` <span style="color:var(--muted);font-size:12px;">(${m.description})</span>` : ''}</span>
+          <span class="opt-price">${shippingCostFor(m) === 0 ? 'Free' : money(m.cost)}</span>
         </label>
       `).join('');
 

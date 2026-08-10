@@ -416,8 +416,16 @@ footer.site-footer {
 .cart-item .info h4 { font-size: 15px; margin: 0 0 4px; }
 .cart-item .info .variant { font-size: 12px; color: var(--muted); }
 .qty-control { display: flex; align-items: center; border: 1px solid var(--line); }
-.qty-control button { width: 28px; height: 28px; border: none; background: none; cursor: pointer; font-size: 15px; }
-.qty-control input { width: 32px; text-align: center; border: none; background: none; font-family: 'Jost'; }
+.qty-control button { width: 28px; height: 28px; border: none; background: none; cursor: pointer; font-size: 15px; flex-shrink: 0; }
+.qty-control input {
+  width: 36px; text-align: center; border: none; background: none; font-family: 'Jost'; font-size: 14px;
+  -moz-appearance: textfield;
+}
+.qty-control input::-webkit-outer-spin-button,
+.qty-control input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 .remove-link { font-size: 12px; color: #a33; cursor: pointer; margin-top: 6px; display: inline-block; }
 
 .summary-box { background: var(--white); border: 1px solid var(--line); padding: 26px; height: fit-content; }
@@ -436,8 +444,11 @@ textarea { resize: vertical; min-height: 70px; }
 .pay-options { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
 .pay-option {
   border: 1px solid var(--line); padding: 12px 14px; display: flex;
-  align-items: center; gap: 10px; cursor: pointer; font-size: 14px;
+  align-items: center; gap: 12px; cursor: pointer; font-size: 14px;
 }
+.pay-option input[type="radio"] { width: auto; flex: 0 0 auto; margin: 0; }
+.pay-option .opt-label { flex: 1; min-width: 0; }
+.pay-option .opt-price { flex: 0 0 auto; font-weight: 500; white-space: nowrap; }
 .pay-option.selected { border-color: var(--olive); background: var(--cream-deep); }
 
 .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }

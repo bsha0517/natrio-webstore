@@ -26,7 +26,7 @@ function renderHeader() {
             </svg>
           </a>
           <a href="/cart.html" class="icon-btn" aria-label="Cart">
-            🛒<span class="cart-count" id="cartCount">0</span>
+            <img src="/images/cart-icon.png" alt="Cart" width="20" height="20"><span class="cart-count" id="cartCount">0</span>
           </a>
         </div>
       </div>
