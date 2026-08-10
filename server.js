@@ -163,7 +163,7 @@ const SITE_URL = process.env.SITE_URL || 'https://natrio.pk';
 app.get('/sitemap.xml', async (req, res) => {
   const products = await readJSON(PRODUCTS_FILE);
   const categories = await readJSON(CATEGORIES_FILE);
-  const blogPosts = await readJSON(BLOG_FILE).filter(p => p.published !== false);
+  const blogPosts = (await readJSON(BLOG_FILE)).filter(p => p.published !== false);
 
   const staticUrls = [
     { loc: '/', priority: '1.0', changefreq: 'daily' },
@@ -311,7 +311,7 @@ app.get('/api/categories', async (req, res) => {
 });
 
 app.get('/api/blog', async (req, res) => {
-  const posts = await readJSON(BLOG_FILE).filter(p => p.published !== false);
+  const posts = (await readJSON(BLOG_FILE)).filter(p => p.published !== false);
   res.json(posts.slice().reverse());
 });
 
@@ -607,11 +607,11 @@ app.get('/api/admin/orders', requireAdmin, async (req, res) => {
 });
 
 app.get('/api/admin/messages', requireAdmin, async (req, res) => {
-  res.json(await readJSON(MESSAGES_FILE).slice().reverse());
+  res.json((await readJSON(MESSAGES_FILE)).slice().reverse());
 });
 
 app.get('/api/admin/subscribers', requireAdmin, async (req, res) => {
-  res.json(await readJSON(SUBSCRIBERS_FILE).slice().reverse());
+  res.json((await readJSON(SUBSCRIBERS_FILE)).slice().reverse());
 });
 
 app.delete('/api/admin/subscribers/:email', requireAdmin, async (req, res) => {
@@ -643,7 +643,7 @@ app.post('/api/admin/campaign/send', requireAdmin, async (req, res) => {
     }
   }
 
-  const subscribers = await readJSON(SUBSCRIBERS_FILE).filter(s => s.active !== false);
+  const subscribers = (await readJSON(SUBSCRIBERS_FILE)).filter(s => s.active !== false);
   if (!subscribers.length) return res.status(400).json({ error: 'There are no active subscribers to send to yet.' });
 
   let sent = 0;
@@ -671,7 +671,7 @@ app.post('/api/admin/campaign/send', requireAdmin, async (req, res) => {
 });
 
 app.get('/api/admin/blog', requireAdmin, async (req, res) => {
-  res.json(await readJSON(BLOG_FILE).slice().reverse());
+  res.json((await readJSON(BLOG_FILE)).slice().reverse());
 });
 
 function slugify(title) {
