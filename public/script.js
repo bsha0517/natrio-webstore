@@ -4,10 +4,13 @@ function renderHeader() {
     <div class="announce">Free Shipping for All Orders from Rs. 2500 &nbsp;|&nbsp; Use Code FIRST for 10% Off</div>
     <header class="site-header">
       <div class="header-inner">
+        <button class="nav-toggle" id="navToggle" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
         <a href="/" class="logo">
           <img src="/images/logo.png" alt="Natrio Organics" class="logo-img">
         </a>
-        <nav class="main-nav">
+        <nav class="main-nav" id="mainNav">
           <a href="/products.html?category=Hair%20Oils">Hair Oils</a>
           <a href="/products.html?category=Facial%20Care">Facial Care</a>
           <a href="/products.html">All Products</a>
@@ -20,6 +23,13 @@ function renderHeader() {
       </div>
     </header>
   `);
+
+  const toggle = document.getElementById('navToggle');
+  const nav = document.getElementById('mainNav');
+  toggle.addEventListener('click', () => {
+    nav.classList.toggle('open');
+    toggle.classList.toggle('open');
+  });
 }
 
 function renderFooter() {
