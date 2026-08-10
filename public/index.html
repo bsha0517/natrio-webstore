@@ -37,7 +37,7 @@
   </section>
 
   <!-- BLOG -->
-  <section class="section" style="background:var(--white);border-top:1px solid var(--line);border-bottom:1px solid var(--line);">
+  <section class="section">
     <div class="section-header">
       <span class="eyebrow">Guides</span>
       <h2>Natural Hair &amp; Skin Care Guides</h2>
@@ -138,7 +138,7 @@
       slider.innerHTML = list.slice(0, 4).map(b => `
         <div class="product-card">
           <a href="/blog-post.html?slug=${b.slug}">
-            <div class="thumb">${b.image ? `<img class="img-main" src="${b.image}" alt="${b.title}" onerror="this.parentElement.style.background='var(--cream-deep)';this.remove()">` : ''}</div>
+            <div class="thumb">${b.image ? `<img src="${b.image}" alt="${b.title}" onerror="this.parentElement.style.background='var(--cream-deep)';this.remove()">` : ''}</div>
           </a>
           <div class="body">
             <h3><a href="/blog-post.html?slug=${b.slug}">${b.title}</a></h3>
