@@ -269,6 +269,16 @@ app.post('/api/checkout', (req, res) => {
   }
 
   const products = readJSON(PRODUCTS_FILE);
+
+  // Verify stock is available before placing the order
+  for (const item of cart) {
+    const product = products.find(p => p.id === item.productId);
+    if (!product) return res.status(400).json({ error: 'One of the items in your cart is no longer available.' });
+    if (product.stock < item.qty) {
+      return res.status(400).json({ error: `Sorry, only ${product.stock} left of "${product.title}". Please update your cart.` });
+    }
+  }
+
   const items = cart.map(item => {
     const product = products.find(p => p.id === item.productId);
     return {
@@ -306,6 +316,13 @@ app.post('/api/checkout', (req, res) => {
   const orders = readJSON(ORDERS_FILE);
   orders.push(order);
   writeJSON(ORDERS_FILE, orders);
+
+  // deduct inventory now that the order is confirmed
+  for (const item of cart) {
+    const product = products.find(p => p.id === item.productId);
+    if (product) product.stock = Math.max(0, product.stock - item.qty);
+  }
+  writeJSON(PRODUCTS_FILE, products);
 
   // clear cart
   req.session.cart = [];
@@ -416,10 +433,29 @@ app.put('/api/admin/orders/:id/status', requireAdmin, (req, res) => {
   const order = orders.find(o => o.id === req.params.id);
   if (!order) return res.status(404).json({ error: 'Order not found' });
 
+  const wasCancelled = order.status === 'cancelled';
   order.status = status;
   if (!order.statusHistory) order.statusHistory = [];
   order.statusHistory.push({ status, date: new Date().toISOString() });
   writeJSON(ORDERS_FILE, orders);
+
+  // restore inventory if the order is newly cancelled; deduct again if it's un-cancelled
+  if (status === 'cancelled' && !wasCancelled) {
+    const products = readJSON(PRODUCTS_FILE);
+    for (const item of order.items) {
+      const product = products.find(p => p.id === item.productId);
+      if (product) product.stock += item.qty;
+    }
+    writeJSON(PRODUCTS_FILE, products);
+  } else if (status !== 'cancelled' && wasCancelled) {
+    const products = readJSON(PRODUCTS_FILE);
+    for (const item of order.items) {
+      const product = products.find(p => p.id === item.productId);
+      if (product) product.stock = Math.max(0, product.stock - item.qty);
+    }
+    writeJSON(PRODUCTS_FILE, products);
+  }
+
   res.json({ success: true, order });
 });
 
@@ -500,8 +536,40 @@ app.put('/api/admin/hero', requireAdmin, (req, res) => {
 });
 
 app.post('/api/admin/products', requireAdmin, (req, res) => {
+  const { title, category, price, stock, description } = req.body;
+  if (!title || !category || price === undefined || price === null || isNaN(Number(price))) {
+    return res.status(400).json({ error: 'Title, category, and a numeric price are required' });
+  }
+
   const products = readJSON(PRODUCTS_FILE);
-  const newProduct = { ...req.body, id: req.body.id || uuidv4().slice(0, 8) };
+  let id = slugify(title);
+  let suffix = 1;
+  while (products.find(p => p.id === id)) { id = `${slugify(title)}-${suffix++}`; }
+
+  const variants = Array.isArray(req.body.variants) && req.body.variants.length
+    ? req.body.variants
+    : (typeof req.body.variants === 'string' && req.body.variants.trim()
+        ? req.body.variants.split(',').map(v => v.trim()).filter(Boolean)
+        : ['Default']);
+
+  const newProduct = {
+    id,
+    title,
+    category,
+    price: Number(price),
+    compareAtPrice: req.body.compareAtPrice ? Number(req.body.compareAtPrice) : null,
+    description: description || '',
+    image: req.body.image || '',
+    hoverImage: req.body.hoverImage || '',
+    variants,
+    stock: stock !== undefined && stock !== '' ? Math.max(0, parseInt(stock)) : 0,
+    featured: !!req.body.featured,
+    bestseller: !!req.body.bestseller,
+    sku: req.body.sku || '',
+    ingredients: req.body.ingredients || '',
+    howToUse: req.body.howToUse || '',
+    benefits: req.body.benefits || ''
+  };
   products.push(newProduct);
   writeJSON(PRODUCTS_FILE, products);
   res.json({ success: true, product: newProduct });
@@ -511,7 +579,19 @@ app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
   const products = readJSON(PRODUCTS_FILE);
   const idx = products.findIndex(p => p.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Not found' });
-  products[idx] = { ...products[idx], ...req.body };
+
+  const body = { ...req.body };
+  if (body.price !== undefined) body.price = Number(body.price);
+  if (body.compareAtPrice !== undefined) body.compareAtPrice = body.compareAtPrice ? Number(body.compareAtPrice) : null;
+  if (body.stock !== undefined) body.stock = Math.max(0, parseInt(body.stock) || 0);
+  if (typeof body.variants === 'string') {
+    body.variants = body.variants.split(',').map(v => v.trim()).filter(Boolean);
+    if (!body.variants.length) body.variants = ['Default'];
+  }
+  body.featured = !!body.featured;
+  body.bestseller = !!body.bestseller;
+
+  products[idx] = { ...products[idx], ...body };
   writeJSON(PRODUCTS_FILE, products);
   res.json({ success: true, product: products[idx] });
 });

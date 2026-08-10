@@ -53,11 +53,79 @@
     </div>
 
     <div id="productsTab" class="hidden">
+      <button class="btn btn-primary" onclick="showNewProductForm()" style="margin-bottom:20px;">+ Add Product</button>
+
+      <div id="productEditorForm" class="hidden" style="border:1px solid var(--line);background:white;padding:20px;margin-bottom:24px;">
+        <input type="hidden" id="prodId">
+        <div class="form-grid">
+          <div class="full">
+            <label>Title *</label>
+            <input id="prodTitle" placeholder="e.g. Olive Hair Oil">
+          </div>
+          <div>
+            <label>Category *</label>
+            <input id="prodCategory" placeholder="e.g. Hair Oils">
+          </div>
+          <div>
+            <label>SKU (optional)</label>
+            <input id="prodSku" placeholder="e.g. NAT-OLV-60">
+          </div>
+          <div>
+            <label>Price (PKR) *</label>
+            <input id="prodPrice" type="number" min="0">
+          </div>
+          <div>
+            <label>Compare-at price (optional)</label>
+            <input id="prodCompareAt" type="number" min="0" placeholder="Shown crossed out if higher than price">
+          </div>
+          <div>
+            <label>Stock quantity *</label>
+            <input id="prodStock" type="number" min="0">
+          </div>
+          <div>
+            <label>Variants / sizes (comma-separated)</label>
+            <input id="prodVariants" placeholder="e.g. 60ml, 100ml">
+          </div>
+          <div class="full">
+            <label>Description</label>
+            <textarea id="prodDescription" rows="3" placeholder="Shown on the product page and cards"></textarea>
+          </div>
+          <div>
+            <label>Main image path</label>
+            <input id="prodImage" placeholder="/images/olive-hair-oil.jpg">
+          </div>
+          <div>
+            <label>Hover image path (optional)</label>
+            <input id="prodHoverImage" placeholder="/images/olive-hair-oil-alt.jpg">
+          </div>
+          <div class="full">
+            <label>Ingredients (optional)</label>
+            <textarea id="prodIngredients" rows="2" placeholder="e.g. 100% cold-pressed olive oil"></textarea>
+          </div>
+          <div class="full">
+            <label>How to use (optional)</label>
+            <textarea id="prodHowToUse" rows="2" placeholder="e.g. Apply to scalp and massage gently before washing"></textarea>
+          </div>
+          <div class="full">
+            <label>Key benefits (comma-separated, optional)</label>
+            <input id="prodBenefits" placeholder="e.g. Reduces hair fall, Adds shine, Nourishes scalp">
+          </div>
+          <div>
+            <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="prodFeatured" style="width:auto;"> Featured on homepage</label>
+          </div>
+          <div>
+            <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="prodBestseller" style="width:auto;"> Show in Bestsellers slider</label>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveProduct()" style="margin-top:14px;">Save Product</button>
+        <button class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);margin-top:14px;margin-left:10px;" onclick="hideProductForm()">Cancel</button>
+        <p id="prodSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
+      </div>
+
       <table>
-        <thead><tr><th>Title</th><th>Category</th><th>Price</th><th>Stock</th></tr></thead>
+        <thead><tr><th>Title</th><th>Category</th><th>Price</th><th>Stock</th><th></th></tr></thead>
         <tbody id="productsBody"></tbody>
       </table>
-      <p style="font-size:13px;color:var(--muted);margin-top:16px;">To add or edit products in bulk, edit <code>data/products.json</code> directly on your server, or extend this panel with a form (see README for the API routes: POST/PUT/DELETE <code>/api/admin/products</code>).</p>
     </div>
 
     <div id="categoriesTab" class="hidden">
@@ -195,12 +263,120 @@
       });
     }
 
+    let allProducts = [];
+
     async function loadProducts() {
       const res = await fetch('/api/products');
-      const products = await res.json();
-      document.getElementById('productsBody').innerHTML = products.map(p => `
-        <tr><td>${p.title}</td><td>${p.category}</td><td>${money(p.price)}</td><td>${p.stock}</td></tr>
-      `).join('');
+      allProducts = await res.json();
+      document.getElementById('productsBody').innerHTML = allProducts.map(p => `
+        <tr>
+          <td>${p.title}</td>
+          <td>${p.category}</td>
+          <td>${money(p.price)}</td>
+          <td>${p.stock === 0 ? '<span style="color:#a33;">Out of stock</span>' : p.stock <= 15 ? `<span style="color:var(--gold);">${p.stock} left</span>` : p.stock}</td>
+          <td>
+            <span style="color:var(--olive);cursor:pointer;margin-right:12px;" onclick="editProduct('${p.id}')">Edit</span>
+            <span style="color:#a33;cursor:pointer;" onclick="deleteProduct('${p.id}')">Delete</span>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="5">No products yet — click "+ Add Product" to add your first one.</td></tr>';
+    }
+
+    function showNewProductForm() {
+      document.getElementById('prodId').value = '';
+      document.getElementById('prodTitle').value = '';
+      document.getElementById('prodCategory').value = '';
+      document.getElementById('prodSku').value = '';
+      document.getElementById('prodPrice').value = '';
+      document.getElementById('prodCompareAt').value = '';
+      document.getElementById('prodStock').value = '';
+      document.getElementById('prodVariants').value = '';
+      document.getElementById('prodDescription').value = '';
+      document.getElementById('prodImage').value = '';
+      document.getElementById('prodHoverImage').value = '';
+      document.getElementById('prodIngredients').value = '';
+      document.getElementById('prodHowToUse').value = '';
+      document.getElementById('prodBenefits').value = '';
+      document.getElementById('prodFeatured').checked = false;
+      document.getElementById('prodBestseller').checked = false;
+      document.getElementById('prodSaveMsg').textContent = '';
+      document.getElementById('productEditorForm').classList.remove('hidden');
+      document.getElementById('productEditorForm').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function hideProductForm() {
+      document.getElementById('productEditorForm').classList.add('hidden');
+    }
+
+    function editProduct(id) {
+      const p = allProducts.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('prodId').value = p.id;
+      document.getElementById('prodTitle').value = p.title || '';
+      document.getElementById('prodCategory').value = p.category || '';
+      document.getElementById('prodSku').value = p.sku || '';
+      document.getElementById('prodPrice').value = p.price ?? '';
+      document.getElementById('prodCompareAt').value = p.compareAtPrice ?? '';
+      document.getElementById('prodStock').value = p.stock ?? '';
+      document.getElementById('prodVariants').value = (p.variants || []).join(', ');
+      document.getElementById('prodDescription').value = p.description || '';
+      document.getElementById('prodImage').value = p.image || '';
+      document.getElementById('prodHoverImage').value = p.hoverImage || '';
+      document.getElementById('prodIngredients').value = p.ingredients || '';
+      document.getElementById('prodHowToUse').value = p.howToUse || '';
+      document.getElementById('prodBenefits').value = p.benefits || '';
+      document.getElementById('prodFeatured').checked = !!p.featured;
+      document.getElementById('prodBestseller').checked = !!p.bestseller;
+      document.getElementById('prodSaveMsg').textContent = '';
+      document.getElementById('productEditorForm').classList.remove('hidden');
+      document.getElementById('productEditorForm').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function saveProduct() {
+      const id = document.getElementById('prodId').value;
+      const payload = {
+        title: document.getElementById('prodTitle').value.trim(),
+        category: document.getElementById('prodCategory').value.trim(),
+        sku: document.getElementById('prodSku').value.trim(),
+        price: document.getElementById('prodPrice').value,
+        compareAtPrice: document.getElementById('prodCompareAt').value,
+        stock: document.getElementById('prodStock').value,
+        variants: document.getElementById('prodVariants').value,
+        description: document.getElementById('prodDescription').value.trim(),
+        image: document.getElementById('prodImage').value.trim(),
+        hoverImage: document.getElementById('prodHoverImage').value.trim(),
+        ingredients: document.getElementById('prodIngredients').value.trim(),
+        howToUse: document.getElementById('prodHowToUse').value.trim(),
+        benefits: document.getElementById('prodBenefits').value.trim(),
+        featured: document.getElementById('prodFeatured').checked,
+        bestseller: document.getElementById('prodBestseller').checked
+      };
+
+      if (!payload.title || !payload.category || payload.price === '') {
+        document.getElementById('prodSaveMsg').style.color = '#a33';
+        document.getElementById('prodSaveMsg').textContent = 'Title, category, and price are required.';
+        return;
+      }
+
+      const res = await fetch(id ? `/api/admin/products/${id}` : '/api/admin/products', {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.error) {
+        document.getElementById('prodSaveMsg').style.color = '#a33';
+        document.getElementById('prodSaveMsg').textContent = data.error;
+        return;
+      }
+      hideProductForm();
+      loadProducts();
+    }
+
+    async function deleteProduct(id) {
+      if (!confirm('Delete this product? This can\'t be undone.')) return;
+      await fetch(`/api/admin/products/${id}`, { method: 'DELETE' });
+      loadProducts();
     }
 
     // ---------- Categories ----------

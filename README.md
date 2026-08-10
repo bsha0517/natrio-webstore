@@ -31,26 +31,29 @@ Put images in `public/images/` and reference them in `data/products.json`
 under each product's `"image"` field, e.g. `"/images/olive-hair-oil.jpg"`.
 If no image is set, a text placeholder is shown instead — nothing will break.
 
-## 3. Edit products / prices
+## 3. Managing products &amp; inventory (admin panel)
 
-Open `data/products.json` in any text editor. Each product looks like:
+You no longer need to edit `data/products.json` by hand — go to
+`/admin.html` → **Products** tab:
 
-```json
-{
-  "id": "olive-hair-oil",
-  "title": "Olive Hair Oil",
-  "category": "Hair Oils",
-  "price": 260,
-  "description": "...",
-  "image": "/images/olive-hair-oil.jpg",
-  "variants": ["60ml", "100ml"],
-  "stock": 100,
-  "featured": true
-}
-```
+- **+ Add Product** to create a new one: title, category, price, an optional
+  "compare at" price (shown crossed out for sales), stock quantity, variants
+  (e.g. `60ml, 100ml`), description, images, ingredients, how-to-use
+  instructions, and key benefits.
+- **Edit** any existing product the same way, including its stock count.
+- **Delete** removes it from the store.
+- Checking **"Featured on homepage"** or **"Show in Bestsellers slider"**
+  controls where it appears.
 
-Add a new product by copying an existing block and giving it a unique `id`.
-Restart the server (`npm start`) after editing.
+**Inventory is now tracked automatically.** When a customer places an order,
+stock is deducted for the items they bought. If you cancel an order from the
+Orders tab, that stock is automatically added back. The admin product table
+flags items with 15 or fewer left, and out-of-stock items show "Out of
+Stock" on the storefront with the Add to Cart button disabled — customers
+can't order more than you actually have.
+
+You can still edit `data/products.json` directly if you prefer working in a
+text editor — just restart the server (`npm start`) after saving.
 
 ## 4. Customer accounts & order tracking
 

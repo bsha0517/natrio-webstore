@@ -257,12 +257,14 @@ footer.site-footer.dark-footer {
 }
 .dark-footer .footer-contact p { font-size: 14px; opacity: .85; margin: 0 0 14px; line-height: 1.6; }
 .dark-footer .footer-contact a { color: var(--gold); }
-.dark-footer .social-row { display: flex; gap: 14px; margin-top: 16px; }
+.dark-footer .social-row { display: flex; gap: 12px; margin-top: 16px; }
 .dark-footer .social-row a {
-  width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25);
-  display: flex; align-items: center; justify-content: center; font-size: 14px;
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; transition: transform .15s ease;
 }
-.dark-footer .social-row a:hover { border-color: var(--gold); color: var(--gold); }
+.dark-footer .social-row a img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.dark-footer .social-row a:hover { transform: scale(1.08); }
 .dark-footer h4 { color: var(--gold); font-size: 14px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 16px; font-family: 'Jost'; font-weight: 600; }
 .dark-footer ul { list-style: none; margin: 0; padding: 0; }
 .dark-footer li { margin-bottom: 10px; font-size: 14px; opacity: .8; }
@@ -281,13 +283,12 @@ footer.site-footer.dark-footer {
   display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
   font-size: 13px; opacity: .7;
 }
-.payment-icons { display: flex; gap: 8px; flex-wrap: wrap; }
-.payment-icons span {
-  display: flex; align-items: center; gap: 5px;
-  border: 1px solid rgba(255,255,255,.2); border-radius: 3px; padding: 4px 9px; font-size: 11px;
-  color: rgba(255,255,255,.85);
+.payment-icons { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.payment-badge {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--white); border-radius: 4px; padding: 4px 8px; height: 26px;
 }
-.payment-icons span svg { flex-shrink: 0; opacity: .85; }
+.payment-badge img { height: 100%; width: auto; display: block; object-fit: contain; }
 
 .btn {
   display: inline-block;

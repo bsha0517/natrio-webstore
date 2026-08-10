@@ -30,6 +30,9 @@
     .pd-meta { font-size: 13px; color: var(--muted); margin-bottom: 18px; line-height: 1.9; }
     .pd-meta strong { color: var(--ink); font-weight: 500; }
     .pd-desc { color: var(--muted); margin-bottom: 22px; }
+    .pd-benefits { list-style: none; padding: 0; margin: -8px 0 22px; }
+    .pd-benefits li { font-size: 13.5px; color: var(--ink); padding-left: 22px; position: relative; margin-bottom: 8px; }
+    .pd-benefits li::before { content: "✓"; position: absolute; left: 0; color: var(--olive); font-weight: 600; }
     .pd-price { font-size: 24px; color: var(--olive-dark); font-weight: 600; margin-bottom: 6px; }
     .stock-note { font-size: 13px; margin-bottom: 20px; }
     .stock-note.low { color: #a3701f; }
@@ -96,19 +99,8 @@
   <div class="pd-layout" id="pd">Loading…</div>
 
   <div class="pd-tabs-section" id="tabsSection" style="display:none;">
-    <div class="pd-tabs">
-      <div class="pd-tab active" data-tab="description">Description</div>
-      <div class="pd-tab" data-tab="shipping">Shipping &amp; Returns</div>
-      <div class="pd-tab" data-tab="howto">How To Use</div>
-    </div>
-    <div class="pd-tab-panel active" id="panel-description"></div>
-    <div class="pd-tab-panel" id="panel-shipping">
-      <p>Orders are dispatched within 1–2 business days. Free shipping on all orders over Rs. 2500 — a flat Rs. 200 shipping fee applies below that. Cash on Delivery is available nationwide.</p>
-      <p>If you're not happy with your order, reach out within 15 days for an exchange. See our full Shipping &amp; Return Policy for details.</p>
-    </div>
-    <div class="pd-tab-panel" id="panel-howto">
-      <p>For best results, apply a small amount to clean skin or scalp and massage gently. Use consistently as part of your daily routine for visible results over time.</p>
-    </div>
+    <div class="pd-tabs" id="pdTabs"></div>
+    <div id="pdTabPanels"></div>
   </div>
 
   <section class="related-section">
@@ -182,6 +174,11 @@
           </div>
 
           <p class="pd-desc">${p.description}</p>
+          ${p.benefits ? `
+            <ul class="pd-benefits">
+              ${p.benefits.split(',').map(b => b.trim()).filter(Boolean).map(b => `<li>${b}</li>`).join('')}
+            </ul>
+          ` : ''}
 
           <div class="pd-price">${money(p.price)}</div>
           ${stockNote}
@@ -218,9 +215,41 @@
         </div>
       `;
 
-      // description tab content
-      document.getElementById('panel-description').innerHTML = `<p>${p.description}</p>`;
+      // build tabs dynamically based on available product data
+      const tabs = [
+        { key: 'description', label: 'Description', html: `<p>${p.description || 'No description yet.'}</p>` }
+      ];
+      if (p.ingredients) {
+        tabs.push({ key: 'ingredients', label: 'Ingredients', html: `<p>${p.ingredients}</p>` });
+      }
+      tabs.push({
+        key: 'shipping', label: 'Shipping & Returns',
+        html: `<p id="shippingTabText">Loading shipping info…</p>`
+      });
+      tabs.push({
+        key: 'howto', label: 'How To Use',
+        html: `<p>${p.howToUse || 'For best results, apply a small amount and massage gently. Use consistently as part of your daily routine for visible results over time.'}</p>`
+      });
+
+      document.getElementById('pdTabs').innerHTML = tabs.map((t, i) => `
+        <div class="pd-tab ${i === 0 ? 'active' : ''}" data-tab="${t.key}">${t.label}</div>
+      `).join('');
+      document.getElementById('pdTabPanels').innerHTML = tabs.map((t, i) => `
+        <div class="pd-tab-panel ${i === 0 ? 'active' : ''}" id="panel-${t.key}">${t.html}</div>
+      `).join('');
       document.getElementById('tabsSection').style.display = 'block';
+
+      // fill in live shipping info once methods are loaded
+      fetch('/api/shipping').then(r => r.json()).then(methods => {
+        const el = document.getElementById('shippingTabText');
+        if (!el) return;
+        if (!methods.length) {
+          el.textContent = 'Please contact us for current shipping rates.';
+          return;
+        }
+        const lines = methods.map(m => `${m.name}${m.description ? ` (${m.description})` : ''} — Rs. ${Number(m.cost).toLocaleString()}${m.freeThreshold ? `, free above Rs. ${Number(m.freeThreshold).toLocaleString()}` : ''}`);
+        el.innerHTML = lines.join('<br>') + `<br><br>If you're not happy with your order, reach out within 7 days for an exchange. See our <a href="/shipping-policy.html">full Shipping &amp; Return Policy</a> for details.`;
+      });
 
       // thumbnail swap
       document.querySelectorAll('.pd-thumb').forEach(thumb => {
