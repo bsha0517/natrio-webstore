@@ -53,29 +53,51 @@ const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'info@natrio.pk';
 let mailTransporter = null;
 if (process.env.SMTP_USER && process.env.SMTP_PASS) {
   mailTransporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    // Render's network to Gmail can be flaky (same kind of intermittent
+    // timeout we saw with MongoDB's DNS earlier) — these keep a single
+    // attempt from hanging forever, so the retry logic below can kick in
+    // quickly instead of the whole request stalling.
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 15000,
+    pool: true,
+    maxConnections: 3
   });
 }
 
-async function sendContactEmail(message) {
+// Every transactional email (order confirmations, shipped/delivered
+// notices, contact form) goes through this, so a single transient network
+// hiccup — which is common on Render's outbound connections — doesn't
+// silently drop the email. Retries twice with a short pause before giving up.
+async function sendMailSafe(mailOptions, attempts = 3) {
   if (!mailTransporter) {
-    console.log('Email not configured (SMTP_USER/SMTP_PASS missing) — message saved but not emailed.');
+    console.log('Email not configured (SMTP_USER/SMTP_PASS missing) — skipping send.');
     return false;
   }
-  try {
-    await mailTransporter.sendMail({
-      from: `"Natrio Organics Website" <${process.env.SMTP_USER}>`,
-      to: CONTACT_EMAIL,
-      replyTo: message.email,
-      subject: `New message from ${message.name} — Natrio Organics site`,
-      text: `Name: ${message.name}\nEmail: ${message.email}\nPhone: ${message.phone || 'N/A'}\n\nMessage:\n${message.message}`
-    });
-    return true;
-  } catch (err) {
-    console.error('Failed to send contact email:', err.message);
-    return false;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await mailTransporter.sendMail(mailOptions);
+      return true;
+    } catch (err) {
+      console.error(`Email send attempt ${attempt}/${attempts} to ${mailOptions.to} failed:`, err.message);
+      if (attempt < attempts) await new Promise(r => setTimeout(r, 2000 * attempt));
+    }
   }
+  return false;
+}
+
+async function sendContactEmail(message) {
+  return sendMailSafe({
+    from: `"Natrio Organics Website" <${process.env.SMTP_USER}>`,
+    to: CONTACT_EMAIL,
+    replyTo: message.email,
+    subject: `New message from ${message.name} — Natrio Organics site`,
+    text: `Name: ${message.name}\nEmail: ${message.email}\nPhone: ${message.phone || 'N/A'}\n\nMessage:\n${message.message}`
+  });
 }
 
 // Each product's variants can now carry their own price (e.g. 60ml vs
@@ -106,43 +128,44 @@ async function sendOrderConfirmationEmails(order) {
 
   // email to the customer, if they gave one
   if (order.customer.email) {
-    try {
-      await mailTransporter.sendMail({
-        from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
-        to: order.customer.email,
-        subject: `Your Natrio Organics order #${order.id} is confirmed`,
-        text: `Hi ${order.customer.name.split(' ')[0]},\n\nThanks for your order! Here's a summary:\n\n${summary}\n\nWe'll email you again once it ships.\n\n— Natrio Organics`
-      });
-    } catch (err) {
-      console.error('Failed to send customer order confirmation email:', err.message);
-    }
+    await sendMailSafe({
+      from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
+      to: order.customer.email,
+      subject: `Your Natrio Organics order #${order.id} is confirmed`,
+      text: `Hi ${order.customer.name.split(' ')[0]},\n\nThanks for your order! Here's a summary:\n\n${summary}\n\nWe'll email you again once it ships.\n\n— Natrio Organics`
+    });
   }
 
   // email to the store owner
-  try {
-    await mailTransporter.sendMail({
-      from: `"Natrio Organics Website" <${process.env.SMTP_USER}>`,
-      to: CONTACT_EMAIL,
-      subject: `New order #${order.id} — Rs. ${order.total}`,
-      text: `A new order was placed.\n\n${summary}\n\nCustomer email: ${order.customer.email || 'not provided'}`
-    });
-  } catch (err) {
-    console.error('Failed to send store owner order notification email:', err.message);
-  }
+  await sendMailSafe({
+    from: `"Natrio Organics Website" <${process.env.SMTP_USER}>`,
+    to: CONTACT_EMAIL,
+    subject: `New order #${order.id} — Rs. ${order.total}`,
+    text: `A new order was placed.\n\n${summary}\n\nCustomer email: ${order.customer.email || 'not provided'}`
+  });
 }
 
-async function sendShippedEmail(order) {
-  if (!mailTransporter || !order.customer.email) return;
-  try {
-    await mailTransporter.sendMail({
-      from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
-      to: order.customer.email,
+async function sendOrderStatusEmail(order, status) {
+  if (!order.customer.email) return;
+
+  const copy = {
+    shipped: {
       subject: `Your Natrio Organics order #${order.id} has shipped`,
-      text: `Hi ${order.customer.name.split(' ')[0]},\n\nGood news — your order #${order.id} is on its way!\n\n${orderItemsText(order)}\n\nDelivery to:\n${order.customer.address}\n${order.customer.city}\n\nExpected delivery: 1–3 business days.\n\n— Natrio Organics`
-    });
-  } catch (err) {
-    console.error('Failed to send shipped notification email:', err.message);
-  }
+      body: `Good news — your order #${order.id} is on its way!\n\n${orderItemsText(order)}\n\nDelivery to:\n${order.customer.address}\n${order.customer.city}\n\nExpected delivery: 1–3 business days.`
+    },
+    delivered: {
+      subject: `Your Natrio Organics order #${order.id} has been delivered`,
+      body: `Your order #${order.id} has been marked as delivered — we hope you love it!\n\n${orderItemsText(order)}\n\nIf anything's not right with your order, just reply to this email or reach us on WhatsApp and we'll sort it out.`
+    }
+  }[status];
+  if (!copy) return;
+
+  await sendMailSafe({
+    from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
+    to: order.customer.email,
+    subject: copy.subject,
+    text: `Hi ${order.customer.name.split(' ')[0]},\n\n${copy.body}\n\n— Natrio Organics`
+  });
 }
 
 // ---------- Canonical domain redirect ----------
@@ -690,17 +713,14 @@ app.post('/api/admin/campaign/send', requireAdmin, async (req, res) => {
 
   // send a test to just yourself first, if requested, without touching the subscriber list
   if (testEmail) {
-    try {
-      await mailTransporter.sendMail({
-        from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
-        to: testEmail,
-        subject: `[TEST] ${subject}`,
-        html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.7;color:#222;">${body}</div>`
-      });
-      return res.json({ success: true, test: true });
-    } catch (err) {
-      return res.status(500).json({ error: 'Failed to send test email: ' + err.message });
-    }
+    const ok = await sendMailSafe({
+      from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
+      to: testEmail,
+      subject: `[TEST] ${subject}`,
+      html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.7;color:#222;">${body}</div>`
+    });
+    if (!ok) return res.status(500).json({ error: 'Failed to send test email after retrying. Check your SMTP settings.' });
+    return res.json({ success: true, test: true });
   }
 
   const subscribers = (await readJSON(SUBSCRIBERS_FILE)).filter(s => s.active !== false);
@@ -710,21 +730,16 @@ app.post('/api/admin/campaign/send', requireAdmin, async (req, res) => {
   let failed = 0;
   for (const sub of subscribers) {
     const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/newsletter/unsubscribe?email=${encodeURIComponent(sub.email)}`;
-    try {
-      await mailTransporter.sendMail({
-        from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
-        to: sub.email,
-        subject,
-        html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.7;color:#222;">${body}</div>
-               <hr style="margin:24px 0;border:none;border-top:1px solid #ddd;">
-               <p style="font-size:12px;color:#888;">You're receiving this because you subscribed to Natrio Organics updates.
-               <a href="${unsubscribeUrl}">Unsubscribe</a></p>`
-      });
-      sent++;
-    } catch (err) {
-      console.error(`Campaign email to ${sub.email} failed:`, err.message);
-      failed++;
-    }
+    const ok = await sendMailSafe({
+      from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
+      to: sub.email,
+      subject,
+      html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.7;color:#222;">${body}</div>
+             <hr style="margin:24px 0;border:none;border-top:1px solid #ddd;">
+             <p style="font-size:12px;color:#888;">You're receiving this because you subscribed to Natrio Organics updates.
+             <a href="${unsubscribeUrl}">Unsubscribe</a></p>`
+    });
+    if (ok) sent++; else failed++;
   }
 
   res.json({ success: true, sent, failed, total: subscribers.length });
@@ -804,6 +819,7 @@ app.put('/api/admin/orders/:id/status', requireAdmin, async (req, res) => {
 
   const wasCancelled = order.status === 'cancelled';
   const wasShipped = order.status === 'shipped';
+  const wasDelivered = order.status === 'delivered';
   order.status = status;
   if (!order.statusHistory) order.statusHistory = [];
   order.statusHistory.push({ status, date: new Date().toISOString() });
@@ -826,9 +842,12 @@ app.put('/api/admin/orders/:id/status', requireAdmin, async (req, res) => {
     await writeJSON(PRODUCTS_FILE, products);
   }
 
-  // notify the customer when their order ships
+  // notify the customer when their order ships or is delivered
   if (status === 'shipped' && !wasShipped) {
-    sendShippedEmail(order).catch(err => console.error('Shipped email error:', err.message));
+    sendOrderStatusEmail(order, 'shipped').catch(err => console.error('Shipped email error:', err.message));
+  }
+  if (status === 'delivered' && !wasDelivered) {
+    sendOrderStatusEmail(order, 'delivered').catch(err => console.error('Delivered email error:', err.message));
   }
 
   res.json({ success: true, order });

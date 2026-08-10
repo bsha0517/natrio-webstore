@@ -166,7 +166,7 @@ Go to **/admin.html**, log in with the password set in `ADMIN_PASSWORD`
 ## 7. Email notifications
 
 The same SMTP setup below (step-by-step further down this section) powers
-three kinds of emails:
+these emails:
 
 - **Contact form** — the Contact Us page saves every message to
   `data/messages.json` (viewable in `/admin.html` → **Messages** tab) and,
@@ -179,6 +179,20 @@ three kinds of emails:
 - **Shipped notification** — when you mark an order as **shipped** from
   `/admin.html` → **Orders** tab, the customer automatically gets an email
   letting them know.
+- **Delivered notification** — same idea, triggered when you mark an order
+  as **delivered**.
+- **Marketing campaigns** — sent from the **Marketing** tab to your
+  subscriber list.
+
+**Reliability:** every one of these emails now automatically retries up to
+3 times with a short pause between attempts if the first try times out —
+this matters because outbound connections from Render to Gmail can
+occasionally be flaky (the same kind of intermittent network hiccup you
+may have seen with MongoDB during setup). A single retry usually clears it
+up. If an email still fails after all attempts, it's logged in your
+Render service logs (e.g. `Shipped email error: ...`) so you can see what
+happened — the order or message itself is always saved regardless, only
+the email notification is affected.
 
 All of this is optional — if you skip the setup below, orders and messages
 are still saved normally, you'll just need to check the admin panel instead
