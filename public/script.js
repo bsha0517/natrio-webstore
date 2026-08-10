@@ -61,10 +61,7 @@ function renderFooter() {
         <div class="footer-contact">
           <img src="/images/logo.png" alt="Natrio Organics" class="footer-logo">
           <p>
-            Plot No. 237-C, Block Commercial,<br>
-            Etihad Town Phase 1, Off Raiwind Road, Lahore<br>
-            Call us: <a href="tel:03303065888">0330 306 5888</a><br>
-            Email: <a href="mailto:info@natrio.pk">info@natrio.pk</a>
+            Natrio Organics is where pure, cold-pressed oils meet everyday natural care for healthier hair and glowing skin 🌿
           </p>
           <div class="social-row">
             <a href="https://www.facebook.com/share/18v6kUqF9a/" target="_blank" aria-label="Facebook">f</a>
@@ -73,7 +70,7 @@ function renderFooter() {
           </div>
         </div>
         <div>
-          <h4>Categories</h4>
+          <h4>Shop</h4>
           <ul>
             <li><a href="/products.html?category=Hair%20Oils">Hair Oils</a></li>
             <li><a href="/products.html?category=Facial%20Care">Facial Care</a></li>
@@ -81,7 +78,7 @@ function renderFooter() {
           </ul>
         </div>
         <div>
-          <h4>Further Info</h4>
+          <h4>Information</h4>
           <ul>
             <li><a href="/about-us.html">About Us</a></li>
             <li><a href="/contact-us.html">Contact Us</a></li>
@@ -138,8 +135,20 @@ function money(n) {
   return 'Rs. ' + Number(n).toLocaleString();
 }
 
+function renderWhatsAppButton() {
+  document.body.insertAdjacentHTML('beforeend', `
+    <a href="https://wa.me/923303065888" target="_blank" class="whatsapp-float" aria-label="Chat with us on WhatsApp">
+      <svg viewBox="0 0 32 32" width="30" height="30" fill="currentColor" aria-hidden="true">
+        <path d="M16.001 3C9.096 3 3.5 8.596 3.5 15.5c0 2.42.68 4.68 1.86 6.6L3 29l7.1-2.31A12.44 12.44 0 0016 28c6.905 0 12.5-5.596 12.5-12.5S22.905 3 16.001 3zm0 22.7c-1.98 0-3.83-.55-5.41-1.5l-.39-.23-4.21 1.37 1.38-4.1-.25-.42a10.18 10.18 0 01-1.61-5.47c0-5.65 4.6-10.25 10.25-10.25S26.25 9.85 26.25 15.5 21.65 25.7 16 25.7z"/>
+        <path d="M21.62 18.13c-.3-.15-1.77-.87-2.05-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.47-.89-.79-1.48-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.6-.91-2.2-.24-.57-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.47 0 1.46 1.06 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.48.71.31 1.26.49 1.7.63.71.22 1.36.19 1.87.12.57-.09 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.13-.27-.2-.57-.35z"/>
+      </svg>
+    </a>
+  `);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   renderHeader();
   renderFooter();
+  renderWhatsAppButton();
   refreshCartCount();
 });
