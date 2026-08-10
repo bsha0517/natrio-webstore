@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blog — Natrio Organics</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
+  <link rel="apple-touch-icon" href="/images/favicon-180.png">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .post-wrap { max-width: 740px; margin: 0 auto; padding: 40px 24px 80px; }
+    .post-wrap .back-link { font-size: 13px; color: var(--muted); display: inline-block; margin-bottom: 20px; }
+    .post-wrap .back-link:hover { color: var(--olive); }
+    .post-wrap h1 { font-size: 30px; margin-bottom: 10px; }
+    .post-wrap .post-date { color: var(--muted); font-size: 13px; margin-bottom: 26px; }
+    .post-wrap .post-image { width: 100%; aspect-ratio: 16/9; background: var(--cream-deep); margin-bottom: 30px; overflow: hidden; }
+    .post-wrap .post-image img { width: 100%; height: 100%; object-fit: cover; }
+    .post-body { color: var(--ink); font-size: 15.5px; line-height: 1.9; }
+    .post-body p { margin-bottom: 18px; }
+    .post-body h2 { font-size: 20px; margin-top: 30px; }
+    .post-body h3 { font-size: 17px; margin-top: 24px; }
+    .post-body ul, .post-body ol { padding-left: 22px; margin-bottom: 18px; }
+    .post-body li { margin-bottom: 8px; }
+    .post-body img { width: 100%; margin: 20px 0; }
+    .post-body a { color: var(--olive); border-bottom: 1px solid var(--olive); }
+  </style>
+</head>
+<body>
+
+  <div class="post-wrap" id="postWrap">Loading…</div>
+
+  <script src="/script.js"></script>
+  <script>
+    const slug = new URLSearchParams(location.search).get('slug');
+    fetch(`/api/blog/${slug}`).then(r => r.json()).then(post => {
+      if (post.error) {
+        document.getElementById('postWrap').innerHTML = `<div class="empty-state">Post not found. <br><br><a href="/blog.html" class="btn btn-dark">Back to Blog</a></div>`;
+        document.title = 'Post Not Found — Natrio Organics';
+        return;
+      }
+      document.title = `${post.title} — Natrio Organics`;
+      document.getElementById('postWrap').innerHTML = `
+        <a href="/blog.html" class="back-link">&larr; Back to all posts</a>
+        <h1>${post.title}</h1>
+        <div class="post-date">${new Date(post.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+        ${post.image ? `<div class="post-image"><img src="${post.image}" alt="${post.title}" onerror="this.parentElement.remove()"></div>` : ''}
+        <div class="post-body">${post.body}</div>
+      `;
+    });
+  </script>
+</body>
+</html>

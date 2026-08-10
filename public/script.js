@@ -14,6 +14,7 @@ function renderHeader() {
           <a href="/products.html?category=Hair%20Oils">Hair Oils</a>
           <a href="/products.html?category=Facial%20Care">Facial Care</a>
           <a href="/products.html">All Products</a>
+          <a href="/blog.html">Blog</a>
           <a href="/account.html" id="mobileAccountLink" class="mobile-only-link">My Account</a>
         </nav>
         <div class="header-actions">
@@ -87,6 +88,7 @@ function renderFooter() {
           <h4>Information</h4>
           <ul>
             <li><a href="/about-us.html">About Us</a></li>
+            <li><a href="/blog.html">Blog</a></li>
             <li><a href="/contact-us.html">Contact Us</a></li>
             <li><a href="/shipping-policy.html">Shipping &amp; Returns</a></li>
             <li><a href="/privacy-policy.html">Privacy Policy</a></li>

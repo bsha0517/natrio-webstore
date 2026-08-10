@@ -41,6 +41,7 @@
       <div class="tab" data-tab="categories">Categories</div>
       <div class="tab" data-tab="shipping">Shipping</div>
       <div class="tab" data-tab="hero">Hero Slider</div>
+      <div class="tab" data-tab="blog">Blog</div>
       <div class="tab" data-tab="messages">Messages</div>
     </div>
 
@@ -89,6 +90,43 @@
         <tbody id="messagesBody"></tbody>
       </table>
     </div>
+
+    <div id="blogTab" class="hidden">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Write or edit blog posts here. Basic HTML (like &lt;p&gt;, &lt;h2&gt;, &lt;ul&gt;, &lt;img&gt;) works in the body if you want formatting — plain text works fine too.</p>
+      <button class="btn btn-primary" onclick="showNewPostForm()" style="margin-bottom:20px;">+ New Post</button>
+      <div id="blogEditorForm" class="hidden" style="border:1px solid var(--line);background:white;padding:20px;margin-bottom:24px;">
+        <input type="hidden" id="blogPostId">
+        <div class="form-grid">
+          <div class="full">
+            <label>Title</label>
+            <input id="blogTitle" placeholder="e.g. Best Hair Oils for Dandruff">
+          </div>
+          <div class="full">
+            <label>Image path</label>
+            <input id="blogImage" placeholder="/images/blog-dandruff.jpg">
+          </div>
+          <div class="full">
+            <label>Excerpt (short summary shown on cards)</label>
+            <input id="blogExcerpt" placeholder="One sentence describing the post">
+          </div>
+          <div class="full">
+            <label>Body</label>
+            <textarea id="blogBody" rows="10" placeholder="Write the full post here..."></textarea>
+          </div>
+          <div class="full">
+            <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="blogPublished" checked style="width:auto;"> Published (visible on the site)</label>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveBlogPost()" style="margin-top:14px;">Save Post</button>
+        <button class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);margin-top:14px;margin-left:10px;" onclick="hideBlogForm()">Cancel</button>
+        <p id="blogSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
+      </div>
+
+      <table>
+        <thead><tr><th>Title</th><th>Status</th><th>Date</th><th></th></tr></thead>
+        <tbody id="blogBody_list"></tbody>
+      </table>
+    </div>
   </div>
 
   <script>
@@ -109,6 +147,7 @@
         loadCategories();
         loadShippingMethods();
         loadMessages();
+        loadBlogPosts();
       } else {
         document.getElementById('loginErr').textContent = 'Incorrect password.';
       }
@@ -124,6 +163,7 @@
         document.getElementById('shippingTab').classList.toggle('hidden', tab.dataset.tab !== 'shipping');
         document.getElementById('heroTab').classList.toggle('hidden', tab.dataset.tab !== 'hero');
         document.getElementById('messagesTab').classList.toggle('hidden', tab.dataset.tab !== 'messages');
+        document.getElementById('blogTab').classList.toggle('hidden', tab.dataset.tab !== 'blog');
       });
     });
 
@@ -312,6 +352,91 @@
           <td>${m.emailed ? '✅' : '⚠️ Not sent'}</td>
         </tr>
       `).join('') || '<tr><td colspan="6">No messages yet.</td></tr>';
+    }
+
+    // ---------- Blog ----------
+    let blogPosts = [];
+
+    async function loadBlogPosts() {
+      const res = await fetch('/api/admin/blog');
+      blogPosts = await res.json();
+      document.getElementById('blogBody_list').innerHTML = blogPosts.map(p => `
+        <tr>
+          <td>${p.title}</td>
+          <td>${p.published !== false ? '✅ Published' : '📝 Draft'}</td>
+          <td>${new Date(p.date).toLocaleDateString()}</td>
+          <td>
+            <span style="color:var(--olive);cursor:pointer;margin-right:12px;" onclick="editBlogPost('${p.id}')">Edit</span>
+            <span style="color:#a33;cursor:pointer;" onclick="deleteBlogPost('${p.id}')">Delete</span>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="4">No posts yet — click "+ New Post" to write your first one.</td></tr>';
+    }
+
+    function showNewPostForm() {
+      document.getElementById('blogPostId').value = '';
+      document.getElementById('blogTitle').value = '';
+      document.getElementById('blogImage').value = '';
+      document.getElementById('blogExcerpt').value = '';
+      document.getElementById('blogBody').value = '';
+      document.getElementById('blogPublished').checked = true;
+      document.getElementById('blogSaveMsg').textContent = '';
+      document.getElementById('blogEditorForm').classList.remove('hidden');
+    }
+
+    function hideBlogForm() {
+      document.getElementById('blogEditorForm').classList.add('hidden');
+    }
+
+    function editBlogPost(id) {
+      const post = blogPosts.find(p => p.id === id);
+      if (!post) return;
+      document.getElementById('blogPostId').value = post.id;
+      document.getElementById('blogTitle').value = post.title;
+      document.getElementById('blogImage').value = post.image || '';
+      document.getElementById('blogExcerpt').value = post.excerpt || '';
+      document.getElementById('blogBody').value = post.body || '';
+      document.getElementById('blogPublished').checked = post.published !== false;
+      document.getElementById('blogSaveMsg').textContent = '';
+      document.getElementById('blogEditorForm').classList.remove('hidden');
+      document.getElementById('blogEditorForm').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function saveBlogPost() {
+      const id = document.getElementById('blogPostId').value;
+      const payload = {
+        title: document.getElementById('blogTitle').value.trim(),
+        image: document.getElementById('blogImage').value.trim(),
+        excerpt: document.getElementById('blogExcerpt').value.trim(),
+        body: document.getElementById('blogBody').value.trim(),
+        published: document.getElementById('blogPublished').checked
+      };
+
+      if (!payload.title || !payload.body) {
+        document.getElementById('blogSaveMsg').style.color = '#a33';
+        document.getElementById('blogSaveMsg').textContent = 'Title and body are required.';
+        return;
+      }
+
+      const res = await fetch(id ? `/api/admin/blog/${id}` : '/api/admin/blog', {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.error) {
+        document.getElementById('blogSaveMsg').style.color = '#a33';
+        document.getElementById('blogSaveMsg').textContent = data.error;
+        return;
+      }
+      hideBlogForm();
+      loadBlogPosts();
+    }
+
+    async function deleteBlogPost(id) {
+      if (!confirm('Delete this post? This can\'t be undone.')) return;
+      await fetch(`/api/admin/blog/${id}`, { method: 'DELETE' });
+      loadBlogPosts();
     }
 
     // ---------- Hero slides ----------

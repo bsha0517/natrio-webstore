@@ -173,7 +173,15 @@ app.get('/api/categories', (req, res) => {
 });
 
 app.get('/api/blog', (req, res) => {
-  res.json(readJSON(BLOG_FILE));
+  const posts = readJSON(BLOG_FILE).filter(p => p.published !== false);
+  res.json(posts.slice().reverse());
+});
+
+app.get('/api/blog/:slug', (req, res) => {
+  const posts = readJSON(BLOG_FILE);
+  const post = posts.find(p => p.slug === req.params.slug && p.published !== false);
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+  res.json(post);
 });
 
 app.get('/api/hero', (req, res) => {
@@ -334,6 +342,69 @@ app.get('/api/admin/orders', requireAdmin, (req, res) => {
 
 app.get('/api/admin/messages', requireAdmin, (req, res) => {
   res.json(readJSON(MESSAGES_FILE).slice().reverse());
+});
+
+app.get('/api/admin/blog', requireAdmin, (req, res) => {
+  res.json(readJSON(BLOG_FILE).slice().reverse());
+});
+
+function slugify(title) {
+  return title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+app.post('/api/admin/blog', requireAdmin, (req, res) => {
+  const { title, excerpt, body, image, published } = req.body;
+  if (!title || !body) return res.status(400).json({ error: 'Title and body are required' });
+
+  const posts = readJSON(BLOG_FILE);
+  let slug = slugify(title);
+  let suffix = 1;
+  while (posts.find(p => p.slug === slug)) { slug = `${slugify(title)}-${suffix++}`; }
+
+  const post = {
+    id: uuidv4().slice(0, 8),
+    slug,
+    title,
+    excerpt: excerpt || '',
+    body,
+    image: image || '',
+    published: published !== false,
+    date: new Date().toISOString()
+  };
+  posts.push(post);
+  writeJSON(BLOG_FILE, posts);
+  res.json({ success: true, post });
+});
+
+app.put('/api/admin/blog/:id', requireAdmin, (req, res) => {
+  const posts = readJSON(BLOG_FILE);
+  const idx = posts.findIndex(p => p.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Post not found' });
+
+  const { title, excerpt, body, image, published } = req.body;
+  if (title && title !== posts[idx].title) {
+    let slug = slugify(title);
+    let suffix = 1;
+    while (posts.find((p, i) => p.slug === slug && i !== idx)) { slug = `${slugify(title)}-${suffix++}`; }
+    posts[idx].slug = slug;
+  }
+  posts[idx] = {
+    ...posts[idx],
+    title: title ?? posts[idx].title,
+    excerpt: excerpt ?? posts[idx].excerpt,
+    body: body ?? posts[idx].body,
+    image: image ?? posts[idx].image,
+    published: published !== undefined ? published : posts[idx].published
+  };
+  writeJSON(BLOG_FILE, posts);
+  res.json({ success: true, post: posts[idx] });
+});
+
+app.delete('/api/admin/blog/:id', requireAdmin, (req, res) => {
+  let posts = readJSON(BLOG_FILE);
+  posts = posts.filter(p => p.id !== req.params.id);
+  writeJSON(BLOG_FILE, posts);
+  res.json({ success: true });
 });
 
 app.put('/api/admin/orders/:id/status', requireAdmin, (req, res) => {

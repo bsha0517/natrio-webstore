@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blog — Natrio Organics</title>
+  <meta name="description" content="Natural hair and skin care guides from Natrio Organics.">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
+  <link rel="apple-touch-icon" href="/images/favicon-180.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <div class="page-header">
+    <h1>Natural Hair &amp; Skin Care Guides</h1>
+  </div>
+
+  <section class="section">
+    <div class="blog-grid" id="blogGrid" style="max-width:var(--max);margin:0 auto;padding:0 24px;"></div>
+  </section>
+
+  <script src="/script.js"></script>
+  <script>
+    fetch('/api/blog').then(r => r.json()).then(list => {
+      const grid = document.getElementById('blogGrid');
+      if (!list.length) {
+        grid.innerHTML = `<div class="empty-state">No posts yet — check back soon.</div>`;
+        return;
+      }
+      grid.innerHTML = list.map(b => `
+        <div class="blog-card">
+          <a href="/blog-post.html?slug=${b.slug}">
+            <div class="thumb">${b.image ? `<img src="${b.image}" alt="${b.title}" onerror="this.parentElement.style.background='var(--cream-deep)';this.remove()">` : ''}</div>
+          </a>
+          <div class="body">
+            <h3><a href="/blog-post.html?slug=${b.slug}">${b.title}</a></h3>
+            <p>${b.excerpt || ''}</p>
+            <a class="read-more" href="/blog-post.html?slug=${b.slug}">Read more</a>
+          </div>
+        </div>
+      `).join('');
+    });
+  </script>
+</body>
+</html>

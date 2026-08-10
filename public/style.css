@@ -149,13 +149,15 @@ nav.main-nav a:hover { color: var(--olive-dark); }
 
 /* ---------- Category cards (product-card sized) ---------- */
 .category-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 20px;
   max-width: var(--max);
   margin: 0 auto;
   padding: 0 24px;
 }
+.category-tile { width: 200px; }
 .category-tile {
   position: relative;
   background: var(--white);
@@ -529,7 +531,8 @@ textarea { resize: vertical; min-height: 70px; }
   .hero-dots { bottom: 16px; }
 
   /* categories */
-  .category-strip { grid-template-columns: repeat(2, 1fr); gap: 14px; padding: 0 16px; }
+  .category-strip { gap: 14px; padding: 0 16px; }
+  .category-tile { width: calc(50% - 7px); }
   .category-tile .cat-label { font-size: 14px; padding: 10px 8px; }
 
   /* sections */

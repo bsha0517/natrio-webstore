@@ -45,6 +45,38 @@
     <div class="blog-grid" id="blogGrid"></div>
   </section>
 
+  <!-- TRUST / SERVICE ICONS -->
+  <section class="icon-boxes">
+    <div class="icon-box">
+      <div class="dot">🚚</div>
+      <div>
+        <h4>Free Shipping</h4>
+        <p>Free Shipping for orders over 2500 PKR</p>
+      </div>
+    </div>
+    <div class="icon-box">
+      <div class="dot">↩️</div>
+      <div>
+        <h4>Money Guarantee</h4>
+        <p>Within 15 days for an exchange.</p>
+      </div>
+    </div>
+    <div class="icon-box">
+      <div class="dot">💬</div>
+      <div>
+        <h4>Online Support</h4>
+        <p>24 hours a day, 7 days a week</p>
+      </div>
+    </div>
+    <div class="icon-box">
+      <div class="dot">💳</div>
+      <div>
+        <h4>Flexible Payment</h4>
+        <p>Pay with Multiple Credit Cards</p>
+      </div>
+    </div>
+  </section>
+
   <!-- INSTAGRAM -->
   <section class="section">
     <div class="section-header">
@@ -94,13 +126,18 @@
 
     // Blog
     fetch('/api/blog').then(r => r.json()).then(list => {
-      document.getElementById('blogGrid').innerHTML = list.map(b => `
+      const grid = document.getElementById('blogGrid');
+      if (!list.length) {
+        grid.closest('section').style.display = 'none';
+        return;
+      }
+      grid.innerHTML = list.slice(0, 3).map(b => `
         <div class="blog-card">
-          <a href="${b.url}"><div class="thumb"><img src="${b.image}" alt="${b.title}" onerror="this.parentElement.style.background='var(--cream-deep)';this.remove()"></div></a>
+          <a href="/blog-post.html?slug=${b.slug}"><div class="thumb">${b.image ? `<img src="${b.image}" alt="${b.title}" onerror="this.parentElement.style.background='var(--cream-deep)';this.remove()">` : ''}</div></a>
           <div class="body">
-            <h3><a href="${b.url}">${b.title}</a></h3>
-            <p>${b.excerpt}</p>
-            <a class="read-more" href="${b.url}">Read more</a>
+            <h3><a href="/blog-post.html?slug=${b.slug}">${b.title}</a></h3>
+            <p>${b.excerpt || ''}</p>
+            <a class="read-more" href="/blog-post.html?slug=${b.slug}">Read more</a>
           </div>
         </div>
       `).join('');
