@@ -36,6 +36,7 @@
       font-size: 24px; line-height: 1; cursor: pointer; color: var(--muted);
     }
     .modal-close:hover { color: var(--ink); }
+    #orderModal.hidden { display: none !important; }
   </style>
 </head>
 <body>
@@ -55,6 +56,7 @@
       <div class="tab" data-tab="products">Products</div>
       <div class="tab" data-tab="categories">Categories</div>
       <div class="tab" data-tab="shipping">Shipping</div>
+      <div class="tab" data-tab="discounts">Discounts</div>
       <div class="tab" data-tab="hero">Hero Slider</div>
       <div class="tab" data-tab="blog">Blog</div>
       <div class="tab" data-tab="messages">Messages</div>
@@ -159,6 +161,50 @@
       <p id="shipSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
     </div>
 
+    <div id="discountsTab" class="hidden">
+      <button class="btn btn-primary" onclick="showNewDiscountForm()" style="margin-bottom:20px;">+ Add Discount Code</button>
+
+      <div id="discountEditorForm" class="hidden" style="border:1px solid var(--line);background:white;padding:20px;margin-bottom:24px;">
+        <input type="hidden" id="discId">
+        <div class="form-grid">
+          <div>
+            <label>Code *</label>
+            <input id="discCode" placeholder="e.g. FIRST10" style="text-transform:uppercase;">
+          </div>
+          <div>
+            <label>Type *</label>
+            <select id="discType">
+              <option value="percent">Percentage off</option>
+              <option value="fixed">Fixed amount off (PKR)</option>
+            </select>
+          </div>
+          <div>
+            <label>Value *</label>
+            <input id="discValue" type="number" min="0" placeholder="e.g. 10 for 10% or 200 for Rs. 200">
+          </div>
+          <div>
+            <label>Minimum order (optional)</label>
+            <input id="discMinSubtotal" type="number" min="0" placeholder="Leave blank for no minimum">
+          </div>
+          <div>
+            <label>Expires on (optional)</label>
+            <input id="discExpiresAt" type="date">
+          </div>
+          <div>
+            <label style="display:flex;align-items:center;gap:8px;margin-top:22px;"><input type="checkbox" id="discActive" checked style="width:auto;"> Active</label>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveDiscount()" style="margin-top:14px;">Save Discount</button>
+        <button class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);margin-top:14px;margin-left:10px;" onclick="hideDiscountForm()">Cancel</button>
+        <p id="discSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
+      </div>
+
+      <table>
+        <thead><tr><th>Code</th><th>Discount</th><th>Min. Order</th><th>Expires</th><th>Status</th><th></th></tr></thead>
+        <tbody id="discountsBody"></tbody>
+      </table>
+    </div>
+
     <div id="heroTab" class="hidden">
       <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Add up to 3 hero slides. Each needs an image path (upload the photo to <code>public/images/</code> first, then reference it here, e.g. <code>/images/hero-2.jpg</code>). Slides rotate automatically every 6 seconds on the homepage.</p>
       <div id="heroSlideEditors"></div>
@@ -236,6 +282,7 @@
         loadHeroSlides();
         loadCategories();
         loadShippingMethods();
+        loadDiscounts();
         loadMessages();
         loadBlogPosts();
       } else {
@@ -251,6 +298,7 @@
         document.getElementById('productsTab').classList.toggle('hidden', tab.dataset.tab !== 'products');
         document.getElementById('categoriesTab').classList.toggle('hidden', tab.dataset.tab !== 'categories');
         document.getElementById('shippingTab').classList.toggle('hidden', tab.dataset.tab !== 'shipping');
+        document.getElementById('discountsTab').classList.toggle('hidden', tab.dataset.tab !== 'discounts');
         document.getElementById('heroTab').classList.toggle('hidden', tab.dataset.tab !== 'hero');
         document.getElementById('messagesTab').classList.toggle('hidden', tab.dataset.tab !== 'messages');
         document.getElementById('blogTab').classList.toggle('hidden', tab.dataset.tab !== 'blog');
@@ -603,6 +651,97 @@
         shippingMethods = data.methods;
         renderShippingEditors();
       }
+    }
+
+    // ---------- Discount codes ----------
+    let discounts = [];
+
+    async function loadDiscounts() {
+      const res = await fetch('/api/admin/discounts');
+      discounts = await res.json();
+      document.getElementById('discountsBody').innerHTML = discounts.map(d => `
+        <tr>
+          <td><strong>${d.code}</strong></td>
+          <td>${d.type === 'percent' ? d.value + '%' : money(d.value)} off</td>
+          <td>${d.minSubtotal ? money(d.minSubtotal) : '—'}</td>
+          <td>${d.expiresAt ? new Date(d.expiresAt).toLocaleDateString() : '—'}</td>
+          <td>${d.active !== false ? '✅ Active' : '⏸️ Inactive'}</td>
+          <td>
+            <span style="color:var(--olive);cursor:pointer;margin-right:12px;" onclick="editDiscount('${d.id}')">Edit</span>
+            <span style="color:#a33;cursor:pointer;" onclick="deleteDiscount('${d.id}')">Delete</span>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="6">No discount codes yet.</td></tr>';
+    }
+
+    function showNewDiscountForm() {
+      document.getElementById('discId').value = '';
+      document.getElementById('discCode').value = '';
+      document.getElementById('discType').value = 'percent';
+      document.getElementById('discValue').value = '';
+      document.getElementById('discMinSubtotal').value = '';
+      document.getElementById('discExpiresAt').value = '';
+      document.getElementById('discActive').checked = true;
+      document.getElementById('discSaveMsg').textContent = '';
+      document.getElementById('discountEditorForm').classList.remove('hidden');
+      document.getElementById('discountEditorForm').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function hideDiscountForm() {
+      document.getElementById('discountEditorForm').classList.add('hidden');
+    }
+
+    function editDiscount(id) {
+      const d = discounts.find(x => x.id === id);
+      if (!d) return;
+      document.getElementById('discId').value = d.id;
+      document.getElementById('discCode').value = d.code;
+      document.getElementById('discType').value = d.type;
+      document.getElementById('discValue').value = d.value;
+      document.getElementById('discMinSubtotal').value = d.minSubtotal || '';
+      document.getElementById('discExpiresAt').value = d.expiresAt ? d.expiresAt.split('T')[0] : '';
+      document.getElementById('discActive').checked = d.active !== false;
+      document.getElementById('discSaveMsg').textContent = '';
+      document.getElementById('discountEditorForm').classList.remove('hidden');
+      document.getElementById('discountEditorForm').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function saveDiscount() {
+      const id = document.getElementById('discId').value;
+      const payload = {
+        code: document.getElementById('discCode').value.trim(),
+        type: document.getElementById('discType').value,
+        value: document.getElementById('discValue').value,
+        minSubtotal: document.getElementById('discMinSubtotal').value,
+        expiresAt: document.getElementById('discExpiresAt').value,
+        active: document.getElementById('discActive').checked
+      };
+
+      if (!payload.code || payload.value === '') {
+        document.getElementById('discSaveMsg').style.color = '#a33';
+        document.getElementById('discSaveMsg').textContent = 'Code and value are required.';
+        return;
+      }
+
+      const res = await fetch(id ? `/api/admin/discounts/${id}` : '/api/admin/discounts', {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.error) {
+        document.getElementById('discSaveMsg').style.color = '#a33';
+        document.getElementById('discSaveMsg').textContent = data.error;
+        return;
+      }
+      hideDiscountForm();
+      loadDiscounts();
+    }
+
+    async function deleteDiscount(id) {
+      if (!confirm('Delete this discount code? This can\'t be undone.')) return;
+      await fetch(`/api/admin/discounts/${id}`, { method: 'DELETE' });
+      loadDiscounts();
     }
 
     // ---------- Contact messages ----------

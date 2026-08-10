@@ -19,13 +19,50 @@
         <h3>Contact & Delivery</h3>
         <div class="form-grid">
           <div><label>Full Name *</label><input name="name" required></div>
-          <div><label>Phone *</label><input name="phone" required placeholder="03xx-xxxxxxx"></div>
-          <div class="full"><label>Email</label><input name="email" type="email"></div>
+          <div>
+            <label>Phone *</label>
+            <input name="phone" type="tel" required placeholder="03xx-xxxxxxx" pattern="^(03\d{9}|\+923\d{9})$" title="Enter a valid Pakistani mobile number, e.g. 03001234567">
+          </div>
+          <div class="full"><label>Email *</label><input name="email" type="email" required></div>
           <div class="full"><label>Address *</label><input name="address" required></div>
-          <div><label>City *</label><input name="city" required></div>
+          <div>
+            <label>City *</label>
+            <select name="city" id="citySelect" required>
+              <option value="" disabled selected>Select your city</option>
+              <option>Lahore</option>
+              <option>Karachi</option>
+              <option>Islamabad</option>
+              <option>Rawalpindi</option>
+              <option>Faisalabad</option>
+              <option>Multan</option>
+              <option>Peshawar</option>
+              <option>Quetta</option>
+              <option>Sialkot</option>
+              <option>Gujranwala</option>
+              <option>Hyderabad</option>
+              <option>Bahawalpur</option>
+              <option>Sargodha</option>
+              <option>Sukkur</option>
+              <option>Abbottabad</option>
+              <option>Rahim Yar Khan</option>
+              <option>Sahiwal</option>
+              <option>Mardan</option>
+              <option>Gujrat</option>
+              <option>Kasur</option>
+              <option value="__other__">Other</option>
+            </select>
+            <input name="cityOther" id="cityOtherInput" placeholder="Enter your city" style="margin-top:8px;display:none;">
+          </div>
           <div><label>Postal Code</label><input name="zip"></div>
           <div class="full"><label>Order Notes (optional)</label><textarea name="notes"></textarea></div>
         </div>
+
+        <h3 style="margin-top:26px;">Discount Code (optional)</h3>
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          <input id="discountInput" placeholder="Enter discount code" style="flex:1;">
+          <button type="button" class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);flex-shrink:0;" onclick="applyDiscount()">Apply</button>
+        </div>
+        <p id="discountMsg" style="font-size:13px;margin-top:8px;"></p>
 
         <h3 style="margin-top:26px;">Shipping Method</h3>
         <div class="pay-options" id="shippingOptions"><p style="color:var(--muted);font-size:13px;">Loading shipping options…</p></div>
@@ -51,6 +88,7 @@
     let cartSubtotal = 0;
     let shippingMethods = [];
     let selectedShippingId = null;
+    let appliedDiscount = null; // { code, amountOff }
 
     async function loadSummary() {
       const res = await fetch('/api/cart');
@@ -71,16 +109,40 @@
     function renderSummary() {
       const method = shippingMethods.find(m => m.id === selectedShippingId) || shippingMethods[0];
       const shipping = shippingCostFor(method);
+      const discountOff = appliedDiscount ? appliedDiscount.amountOff : 0;
       fetch('/api/cart').then(r => r.json()).then(data => {
         document.getElementById('summaryCol').innerHTML = `
           <h3>Order Summary</h3>
           ${data.items.map(i => `
             <div class="summary-row"><span>${i.product.title} (${i.variant}) × ${i.qty}</span><span>${money(i.product.price * i.qty)}</span></div>
           `).join('')}
+          ${appliedDiscount ? `<div class="summary-row" style="color:var(--olive);"><span>Discount (${appliedDiscount.code})</span><span>−${money(discountOff)}</span></div>` : ''}
           <div class="summary-row"><span>Shipping${method ? ` (${method.name})` : ''}</span><span>${shipping === 0 ? 'Free' : money(shipping)}</span></div>
-          <div class="summary-row total"><span>Total</span><span>${money(cartSubtotal + shipping)}</span></div>
+          <div class="summary-row total"><span>Total</span><span>${money(Math.max(0, cartSubtotal - discountOff + shipping))}</span></div>
         `;
       });
+    }
+
+    async function applyDiscount() {
+      const code = document.getElementById('discountInput').value.trim();
+      const msg = document.getElementById('discountMsg');
+      if (!code) { msg.style.color = '#a33'; msg.textContent = 'Enter a code first.'; return; }
+
+      const res = await fetch('/api/discounts/validate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, subtotal: cartSubtotal })
+      });
+      const data = await res.json();
+      if (data.error) {
+        appliedDiscount = null;
+        msg.style.color = '#a33';
+        msg.textContent = data.error;
+      } else {
+        appliedDiscount = { code: data.code, amountOff: data.amountOff };
+        msg.style.color = 'var(--olive)';
+        msg.textContent = `"${data.code}" applied — you saved ${money(data.amountOff)}.`;
+      }
+      renderSummary();
     }
 
     async function loadShippingMethods() {
@@ -127,10 +189,32 @@
       });
     });
 
+    // City "Other" toggle
+    const citySelect = document.getElementById('citySelect');
+    const cityOtherInput = document.getElementById('cityOtherInput');
+    citySelect.addEventListener('change', () => {
+      const isOther = citySelect.value === '__other__';
+      cityOtherInput.style.display = isOther ? 'block' : 'none';
+      cityOtherInput.required = isOther;
+    });
+
     document.getElementById('checkoutForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
       const body = Object.fromEntries(fd.entries());
+
+      if (body.city === '__other__') {
+        body.city = (body.cityOther || '').trim();
+        if (!body.city) {
+          alert('Please enter your city.');
+          return;
+        }
+      }
+      delete body.cityOther;
+
+      if (appliedDiscount) body.discountCode = appliedDiscount.code;
+      body.shippingMethodId = selectedShippingId;
+
       const btn = e.target.querySelector('button[type=submit]');
       btn.textContent = 'Placing order…';
       btn.disabled = true;

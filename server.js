@@ -16,6 +16,7 @@ const BLOG_FILE = path.join(__dirname, 'data', 'blog.json');
 const HERO_FILE = path.join(__dirname, 'data', 'hero.json');
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 const SHIPPING_FILE = path.join(__dirname, 'data', 'shipping.json');
+const DISCOUNTS_FILE = path.join(__dirname, 'data', 'discounts.json');
 const MESSAGES_FILE = path.join(__dirname, 'data', 'messages.json');
 
 // make sure orders.json / users.json / messages.json exist
@@ -70,7 +71,7 @@ async function sendOrderConfirmationEmails(order) {
     return;
   }
   const itemsText = orderItemsText(order);
-  const summary = `Order #${order.id}\n\nItems:\n${itemsText}\n\nSubtotal: Rs. ${order.subtotal}\nShipping (${order.shippingMethod}): ${order.shipping === 0 ? 'Free' : 'Rs. ' + order.shipping}\nTotal: Rs. ${order.total}\n\nPayment method: ${order.paymentMethod.toUpperCase()}\n\nDelivery to:\n${order.customer.name}\n${order.customer.address}\n${order.customer.city}\nPhone: ${order.customer.phone}`;
+  const summary = `Order #${order.id}\n\nItems:\n${itemsText}\n\nSubtotal: Rs. ${order.subtotal}${order.discountAmount ? `\nDiscount (${order.discountCode}): -Rs. ${order.discountAmount}` : ''}\nShipping (${order.shippingMethod}): ${order.shipping === 0 ? 'Free' : 'Rs. ' + order.shipping}\nTotal: Rs. ${order.total}\n\nPayment method: ${order.paymentMethod.toUpperCase()}\n\nDelivery to:\n${order.customer.name}\n${order.customer.address}\n${order.customer.city}\nPhone: ${order.customer.phone}`;
 
   // email to the customer, if they gave one
   if (order.customer.email) {
@@ -245,6 +246,29 @@ app.get('/api/shipping', (req, res) => {
   res.json(readJSON(SHIPPING_FILE));
 });
 
+app.post('/api/discounts/validate', (req, res) => {
+  const { code, subtotal } = req.body;
+  if (!code) return res.status(400).json({ error: 'Enter a discount code' });
+
+  const discounts = readJSON(DISCOUNTS_FILE);
+  const discount = discounts.find(d => d.code.toLowerCase() === String(code).trim().toLowerCase());
+
+  if (!discount) return res.status(404).json({ error: 'That discount code isn\'t valid' });
+  if (discount.active === false) return res.status(400).json({ error: 'That discount code is no longer active' });
+  if (discount.expiresAt && new Date(discount.expiresAt) < new Date()) {
+    return res.status(400).json({ error: 'That discount code has expired' });
+  }
+  if (discount.minSubtotal && Number(subtotal) < discount.minSubtotal) {
+    return res.status(400).json({ error: `This code requires a minimum order of Rs. ${discount.minSubtotal}` });
+  }
+
+  const amountOff = discount.type === 'percent'
+    ? Math.round(Number(subtotal) * (discount.value / 100))
+    : Math.min(discount.value, Number(subtotal));
+
+  res.json({ success: true, code: discount.code, type: discount.type, value: discount.value, amountOff });
+});
+
 app.post('/api/contact', async (req, res) => {
   const { name, email, phone, message } = req.body;
   if (!name || !email || !message) {
@@ -314,11 +338,18 @@ app.post('/api/cart/remove', (req, res) => {
 
 // ---------- CHECKOUT / ORDER ROUTES ----------
 app.post('/api/checkout', (req, res) => {
-  const { name, email, phone, address, city, paymentMethod, shippingMethodId, notes } = req.body;
+  const { name, email, phone, address, city, paymentMethod, shippingMethodId, discountCode, notes } = req.body;
   const cart = getCart(req);
   if (!cart.length) return res.status(400).json({ error: 'Cart is empty' });
-  if (!name || !phone || !address || !city) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  if (!name || !email || !phone || !address || !city) {
+    return res.status(400).json({ error: 'Name, email, phone, address, and city are all required' });
+  }
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ error: 'Please enter a valid email address' });
+  }
+  const cleanedPhone = String(phone).replace(/[\s-]/g, '');
+  if (!/^(03\d{9}|\+923\d{9})$/.test(cleanedPhone)) {
+    return res.status(400).json({ error: 'Please enter a valid Pakistani mobile number (e.g. 03xx-xxxxxxx)' });
   }
 
   const products = readJSON(PRODUCTS_FILE);
@@ -344,11 +375,23 @@ app.post('/api/checkout', (req, res) => {
   });
   const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0);
 
+  // Optional discount code
+  let discountAmount = 0;
+  let appliedDiscountCode = null;
+  if (discountCode) {
+    const discounts = readJSON(DISCOUNTS_FILE);
+    const discount = discounts.find(d => d.code.toLowerCase() === String(discountCode).trim().toLowerCase());
+    if (discount && discount.active !== false && (!discount.expiresAt || new Date(discount.expiresAt) >= new Date()) && (!discount.minSubtotal || subtotal >= discount.minSubtotal)) {
+      discountAmount = discount.type === 'percent' ? Math.round(subtotal * (discount.value / 100)) : Math.min(discount.value, subtotal);
+      appliedDiscountCode = discount.code;
+    }
+  }
+
   const shippingMethods = readJSON(SHIPPING_FILE);
   const method = shippingMethods.find(m => m.id === shippingMethodId) || shippingMethods[0];
   if (!method) return res.status(400).json({ error: 'No shipping method available. Please contact the store.' });
   const shipping = (method.freeThreshold && subtotal >= method.freeThreshold) ? 0 : method.cost;
-  const total = subtotal + shipping;
+  const total = Math.max(0, subtotal - discountAmount + shipping);
 
   const order = {
     id: uuidv4().slice(0, 8).toUpperCase(),
@@ -357,6 +400,8 @@ app.post('/api/checkout', (req, res) => {
     customer: { name, email, phone, address, city },
     items,
     subtotal,
+    discountCode: appliedDiscountCode,
+    discountAmount,
     shippingMethod: method.name,
     shipping,
     total,
@@ -582,6 +627,61 @@ app.put('/api/admin/shipping', requireAdmin, (req, res) => {
 
   writeJSON(SHIPPING_FILE, methods);
   res.json({ success: true, methods });
+});
+
+app.get('/api/admin/discounts', requireAdmin, (req, res) => {
+  res.json(readJSON(DISCOUNTS_FILE));
+});
+
+app.post('/api/admin/discounts', requireAdmin, (req, res) => {
+  const { code, type, value, minSubtotal, expiresAt } = req.body;
+  if (!code || !type || value === undefined || value === null || isNaN(Number(value))) {
+    return res.status(400).json({ error: 'Code, type, and a numeric value are required' });
+  }
+  if (!['percent', 'fixed'].includes(type)) return res.status(400).json({ error: 'Type must be "percent" or "fixed"' });
+
+  const discounts = readJSON(DISCOUNTS_FILE);
+  const normalizedCode = String(code).trim().toUpperCase();
+  if (discounts.find(d => d.code === normalizedCode)) {
+    return res.status(400).json({ error: 'A discount with this code already exists' });
+  }
+
+  const discount = {
+    id: uuidv4().slice(0, 8),
+    code: normalizedCode,
+    type,
+    value: Number(value),
+    minSubtotal: minSubtotal ? Number(minSubtotal) : null,
+    expiresAt: expiresAt || null,
+    active: true
+  };
+  discounts.push(discount);
+  writeJSON(DISCOUNTS_FILE, discounts);
+  res.json({ success: true, discount });
+});
+
+app.put('/api/admin/discounts/:id', requireAdmin, (req, res) => {
+  const discounts = readJSON(DISCOUNTS_FILE);
+  const idx = discounts.findIndex(d => d.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Discount not found' });
+
+  const { code, type, value, minSubtotal, expiresAt, active } = req.body;
+  if (code) discounts[idx].code = String(code).trim().toUpperCase();
+  if (type) discounts[idx].type = type;
+  if (value !== undefined) discounts[idx].value = Number(value);
+  if (minSubtotal !== undefined) discounts[idx].minSubtotal = minSubtotal ? Number(minSubtotal) : null;
+  if (expiresAt !== undefined) discounts[idx].expiresAt = expiresAt || null;
+  if (active !== undefined) discounts[idx].active = !!active;
+
+  writeJSON(DISCOUNTS_FILE, discounts);
+  res.json({ success: true, discount: discounts[idx] });
+});
+
+app.delete('/api/admin/discounts/:id', requireAdmin, (req, res) => {
+  let discounts = readJSON(DISCOUNTS_FILE);
+  discounts = discounts.filter(d => d.id !== req.params.id);
+  writeJSON(DISCOUNTS_FILE, discounts);
+  res.json({ success: true });
 });
 
 app.get('/api/admin/hero', requireAdmin, (req, res) => {
