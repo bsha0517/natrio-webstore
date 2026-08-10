@@ -47,12 +47,18 @@
         </div>
       `).join('');
 
-      const shipping = data.subtotal >= 2500 ? 0 : 200;
+      const shippingRes = await fetch('/api/shipping');
+      const shippingMethods = await shippingRes.json();
+      const defaultMethod = shippingMethods[0];
+      const shipping = defaultMethod
+        ? ((defaultMethod.freeThreshold && data.subtotal >= defaultMethod.freeThreshold) ? 0 : defaultMethod.cost)
+        : 0;
       document.getElementById('summaryCol').innerHTML = `
         <h3>Order Summary</h3>
         <div class="summary-row"><span>Subtotal</span><span>${money(data.subtotal)}</span></div>
-        <div class="summary-row"><span>Shipping</span><span>${shipping === 0 ? 'Free' : money(shipping)}</span></div>
+        <div class="summary-row"><span>Shipping${defaultMethod ? ` (${defaultMethod.name})` : ''}</span><span>${shipping === 0 ? 'Free' : money(shipping)}</span></div>
         <div class="summary-row total"><span>Total</span><span>${money(data.subtotal + shipping)}</span></div>
+        ${shippingMethods.length > 1 ? `<p style="font-size:12px;color:var(--muted);margin-top:-6px;">More shipping options available at checkout.</p>` : ''}
         <a href="/checkout.html" class="btn btn-primary btn-full" style="margin-top:16px;">Proceed to Checkout</a>
         <a href="/products.html" class="btn btn-outline btn-full" style="margin-top:10px;color:var(--olive-dark);border-color:var(--line);">Continue Shopping</a>
       `;

@@ -61,9 +61,10 @@ function renderFooter() {
         <div class="footer-contact">
           <img src="/images/logo.png" alt="Natrio Organics" class="footer-logo">
           <p>
-            Lahore, Pakistan<br>
-            Call us: <a href="tel:+920000000000">+92 300 0000000</a><br>
-            Email: <a href="mailto:hello@natrio.pk">hello@natrio.pk</a>
+            Plot No. 237-C, Block Commercial,<br>
+            Etihad Town Phase 1, Off Raiwind Road, Lahore<br>
+            Call us: <a href="tel:03303065888">0330 306 5888</a><br>
+            Email: <a href="mailto:info@natrio.pk">info@natrio.pk</a>
           </p>
           <div class="social-row">
             <a href="https://www.facebook.com/share/18v6kUqF9a/" target="_blank" aria-label="Facebook">f</a>
@@ -82,10 +83,10 @@ function renderFooter() {
         <div>
           <h4>Further Info</h4>
           <ul>
-            <li><a href="#">About Us</a></li>
-            <li><a href="#">Contact Us</a></li>
-            <li><a href="#">Shipping &amp; Returns</a></li>
-            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="/about-us.html">About Us</a></li>
+            <li><a href="/contact-us.html">Contact Us</a></li>
+            <li><a href="/shipping-policy.html">Shipping &amp; Returns</a></li>
+            <li><a href="/privacy-policy.html">Privacy Policy</a></li>
           </ul>
         </div>
         <div class="newsletter-mini">

@@ -27,6 +27,9 @@
           <div class="full"><label>Order Notes (optional)</label><textarea name="notes"></textarea></div>
         </div>
 
+        <h3 style="margin-top:26px;">Shipping Method</h3>
+        <div class="pay-options" id="shippingOptions"><p style="color:var(--muted);font-size:13px;">Loading shipping options…</p></div>
+
         <h3 style="margin-top:26px;">Payment Method</h3>
         <div class="pay-options" id="payOptions">
           <label class="pay-option selected"><input type="radio" name="paymentMethod" value="cod" checked style="margin:0;"> Cash on Delivery</label>
@@ -45,6 +48,10 @@
 
   <script src="/script.js"></script>
   <script>
+    let cartSubtotal = 0;
+    let shippingMethods = [];
+    let selectedShippingId = null;
+
     async function loadSummary() {
       const res = await fetch('/api/cart');
       const data = await res.json();
@@ -52,17 +59,59 @@
         location.href = '/cart.html';
         return;
       }
-      const shipping = data.subtotal >= 2500 ? 0 : 200;
-      document.getElementById('summaryCol').innerHTML = `
-        <h3>Order Summary</h3>
-        ${data.items.map(i => `
-          <div class="summary-row"><span>${i.product.title} (${i.variant}) × ${i.qty}</span><span>${money(i.product.price * i.qty)}</span></div>
-        `).join('')}
-        <div class="summary-row"><span>Shipping</span><span>${shipping === 0 ? 'Free' : money(shipping)}</span></div>
-        <div class="summary-row total"><span>Total</span><span>${money(data.subtotal + shipping)}</span></div>
-      `;
+      cartSubtotal = data.subtotal;
+      renderSummary();
     }
-    loadSummary();
+
+    function shippingCostFor(method) {
+      if (!method) return 0;
+      return (method.freeThreshold && cartSubtotal >= method.freeThreshold) ? 0 : method.cost;
+    }
+
+    function renderSummary() {
+      const method = shippingMethods.find(m => m.id === selectedShippingId) || shippingMethods[0];
+      const shipping = shippingCostFor(method);
+      fetch('/api/cart').then(r => r.json()).then(data => {
+        document.getElementById('summaryCol').innerHTML = `
+          <h3>Order Summary</h3>
+          ${data.items.map(i => `
+            <div class="summary-row"><span>${i.product.title} (${i.variant}) × ${i.qty}</span><span>${money(i.product.price * i.qty)}</span></div>
+          `).join('')}
+          <div class="summary-row"><span>Shipping${method ? ` (${method.name})` : ''}</span><span>${shipping === 0 ? 'Free' : money(shipping)}</span></div>
+          <div class="summary-row total"><span>Total</span><span>${money(cartSubtotal + shipping)}</span></div>
+        `;
+      });
+    }
+
+    async function loadShippingMethods() {
+      const res = await fetch('/api/shipping');
+      shippingMethods = await res.json();
+      if (!shippingMethods.length) {
+        document.getElementById('shippingOptions').innerHTML = `<p style="color:var(--muted);font-size:13px;">No shipping methods are configured yet. Please contact the store.</p>`;
+        return;
+      }
+      selectedShippingId = shippingMethods[0].id;
+      document.getElementById('shippingOptions').innerHTML = shippingMethods.map((m, i) => `
+        <label class="pay-option ${i === 0 ? 'selected' : ''}" data-shipping-id="${m.id}">
+          <input type="radio" name="shippingMethodId" value="${m.id}" ${i === 0 ? 'checked' : ''} style="margin:0;">
+          <span style="flex:1;">
+            ${m.name}${m.description ? ` <span style="color:var(--muted);font-size:12px;">— ${m.description}</span>` : ''}
+          </span>
+          <span style="font-weight:500;">${shippingCostFor(m) === 0 ? 'Free' : money(m.cost)}</span>
+        </label>
+      `).join('');
+
+      document.querySelectorAll('#shippingOptions .pay-option').forEach(el => {
+        el.addEventListener('click', () => {
+          document.querySelectorAll('#shippingOptions .pay-option').forEach(o => o.classList.remove('selected'));
+          el.classList.add('selected');
+          selectedShippingId = el.dataset.shippingId;
+          renderSummary();
+        });
+      });
+    }
+
+    loadSummary().then(loadShippingMethods);
 
     // Pre-fill contact details if the shopper is logged in
     fetch('/api/auth/me').then(r => r.json()).then(data => {
@@ -73,9 +122,9 @@
       }
     });
 
-    document.querySelectorAll('.pay-option').forEach(el => {
+    document.querySelectorAll('#payOptions .pay-option').forEach(el => {
       el.addEventListener('click', () => {
-        document.querySelectorAll('.pay-option').forEach(o => o.classList.remove('selected'));
+        document.querySelectorAll('#payOptions .pay-option').forEach(o => o.classList.remove('selected'));
         el.classList.add('selected');
       });
     });

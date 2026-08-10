@@ -39,7 +39,9 @@
       <div class="tab active" data-tab="orders">Orders</div>
       <div class="tab" data-tab="products">Products</div>
       <div class="tab" data-tab="categories">Categories</div>
+      <div class="tab" data-tab="shipping">Shipping</div>
       <div class="tab" data-tab="hero">Hero Slider</div>
+      <div class="tab" data-tab="messages">Messages</div>
     </div>
 
     <div id="ordersTab">
@@ -65,12 +67,27 @@
       <p id="catSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
     </div>
 
+    <div id="shippingTab" class="hidden">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Add as many shipping methods as you offer (e.g. Standard, Express). Leave "Free above" blank if that method should never be free.</p>
+      <div id="shippingEditors"></div>
+      <button class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);margin-top:6px;" onclick="addShippingRow()">+ Add Shipping Method</button>
+      <button class="btn btn-primary" style="margin-top:6px;margin-left:10px;" onclick="saveShippingMethods()">Save Shipping Methods</button>
+      <p id="shipSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
+    </div>
+
     <div id="heroTab" class="hidden">
       <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Add up to 3 hero slides. Each needs an image path (upload the photo to <code>public/images/</code> first, then reference it here, e.g. <code>/images/hero-2.jpg</code>). Slides rotate automatically every 6 seconds on the homepage.</p>
       <div id="heroSlideEditors"></div>
       <button class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);margin-top:10px;" onclick="addHeroSlide()" id="addSlideBtn">+ Add Slide</button>
       <button class="btn btn-primary" style="margin-top:10px;margin-left:10px;" onclick="saveHeroSlides()">Save Hero Slides</button>
       <p id="heroSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
+    </div>
+
+    <div id="messagesTab" class="hidden">
+      <table>
+        <thead><tr><th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Message</th><th>Emailed?</th></tr></thead>
+        <tbody id="messagesBody"></tbody>
+      </table>
     </div>
   </div>
 
@@ -90,6 +107,8 @@
         loadProducts();
         loadHeroSlides();
         loadCategories();
+        loadShippingMethods();
+        loadMessages();
       } else {
         document.getElementById('loginErr').textContent = 'Incorrect password.';
       }
@@ -102,7 +121,9 @@
         document.getElementById('ordersTab').classList.toggle('hidden', tab.dataset.tab !== 'orders');
         document.getElementById('productsTab').classList.toggle('hidden', tab.dataset.tab !== 'products');
         document.getElementById('categoriesTab').classList.toggle('hidden', tab.dataset.tab !== 'categories');
+        document.getElementById('shippingTab').classList.toggle('hidden', tab.dataset.tab !== 'shipping');
         document.getElementById('heroTab').classList.toggle('hidden', tab.dataset.tab !== 'hero');
+        document.getElementById('messagesTab').classList.toggle('hidden', tab.dataset.tab !== 'messages');
       });
     });
 
@@ -205,6 +226,92 @@
       const msg = document.getElementById('catSaveMsg');
       msg.textContent = 'Saved! Refresh the homepage to see the changes.';
       loadCategories();
+    }
+
+    // ---------- Shipping methods ----------
+    let shippingMethods = [];
+
+    async function loadShippingMethods() {
+      const res = await fetch('/api/admin/shipping');
+      shippingMethods = await res.json();
+      renderShippingEditors();
+    }
+
+    function renderShippingEditors() {
+      document.getElementById('shippingEditors').innerHTML = shippingMethods.map((m, i) => `
+        <div style="border:1px solid var(--line);background:white;padding:16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <strong>Method ${i + 1}</strong>
+            <span style="color:#a33;cursor:pointer;font-size:13px;" onclick="removeShippingRow(${i})">Remove</span>
+          </div>
+          <div class="form-grid">
+            <div>
+              <label>Name</label>
+              <input value="${m.name || ''}" onchange="updateShippingField(${i},'name',this.value)" placeholder="e.g. Standard Delivery">
+            </div>
+            <div>
+              <label>Description</label>
+              <input value="${m.description || ''}" onchange="updateShippingField(${i},'description',this.value)" placeholder="e.g. 1–3 business days">
+            </div>
+            <div>
+              <label>Cost (PKR)</label>
+              <input type="number" min="0" value="${m.cost ?? ''}" onchange="updateShippingField(${i},'cost',this.value)">
+            </div>
+            <div>
+              <label>Free above (PKR) — optional</label>
+              <input type="number" min="0" value="${m.freeThreshold ?? ''}" onchange="updateShippingField(${i},'freeThreshold',this.value)" placeholder="Leave blank for never free">
+            </div>
+          </div>
+        </div>
+      `).join('') || '<p style="color:var(--muted);font-size:13px;">No shipping methods yet — add one below.</p>';
+    }
+
+    function updateShippingField(i, field, value) {
+      shippingMethods[i][field] = value;
+    }
+
+    function addShippingRow() {
+      shippingMethods.push({ name: '', description: '', cost: 0, freeThreshold: null });
+      renderShippingEditors();
+    }
+
+    function removeShippingRow(i) {
+      shippingMethods.splice(i, 1);
+      renderShippingEditors();
+    }
+
+    async function saveShippingMethods() {
+      const res = await fetch('/api/admin/shipping', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ methods: shippingMethods })
+      });
+      const data = await res.json();
+      const msg = document.getElementById('shipSaveMsg');
+      if (data.error) {
+        msg.style.color = '#a33';
+        msg.textContent = data.error;
+      } else {
+        msg.style.color = 'var(--olive)';
+        msg.textContent = 'Saved! These options now appear at checkout.';
+        shippingMethods = data.methods;
+        renderShippingEditors();
+      }
+    }
+
+    // ---------- Contact messages ----------
+    async function loadMessages() {
+      const res = await fetch('/api/admin/messages');
+      const messages = await res.json();
+      document.getElementById('messagesBody').innerHTML = messages.map(m => `
+        <tr>
+          <td>${new Date(m.date).toLocaleDateString()}</td>
+          <td>${m.name}</td>
+          <td><a href="mailto:${m.email}" style="color:var(--olive);">${m.email}</a></td>
+          <td>${m.phone || '—'}</td>
+          <td style="max-width:320px;white-space:normal;">${m.message}</td>
+          <td>${m.emailed ? '✅' : '⚠️ Not sent'}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="6">No messages yet.</td></tr>';
     }
 
     // ---------- Hero slides ----------

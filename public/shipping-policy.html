@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shipping Information — Natrio Organics</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
+  <link rel="apple-touch-icon" href="/images/favicon-180.png">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .policy-wrap { max-width: 820px; margin: 0 auto; padding: 46px 24px 90px; }
+    .policy-wrap h1 { font-size: 30px; margin-bottom: 30px; }
+    .policy-wrap h2 { font-size: 19px; margin-top: 34px; margin-bottom: 10px; color: var(--olive); }
+    .policy-wrap p { color: var(--ink); font-size: 14.5px; line-height: 1.8; margin-bottom: 14px; }
+    .policy-wrap ul { margin: 0 0 14px; padding-left: 20px; }
+    .policy-wrap li { color: var(--ink); font-size: 14.5px; line-height: 1.8; margin-bottom: 8px; }
+    .policy-wrap a { color: var(--olive); border-bottom: 1px solid var(--olive); }
+    .policy-wrap strong { color: var(--olive-dark); }
+    .info-card {
+      background: var(--white); border: 1px solid var(--line); padding: 20px 22px; margin-bottom: 18px;
+    }
+    .info-card .label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; display: block; }
+    .note-box {
+      background: var(--cream-deep); border-left: 3px solid var(--rose); padding: 14px 18px; font-size: 13.5px; color: var(--ink); margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="policy-wrap">
+    <h1>Shipping Information</h1>
+
+    <p>Currently, Natrio Organics offers delivery service to Pakistan only.</p>
+
+    <div class="info-card">
+      <span class="label">Payment Options</span>
+      <ul>
+        <li>Cash on Delivery (COD) — Available</li>
+        <li>Credit Card or Debit Card — Available</li>
+      </ul>
+      <p style="margin-bottom:0;">We dispatch COD orders only after you've received a confirmation call or message from us. Please double-check your mobile number when placing an order.</p>
+    </div>
+
+    <h2>Processing Time</h2>
+    <p>Orders placed on business days before 2:00 PM will begin processing the same day. Orders placed after 2:00 PM will be processed the following day. Once your order is shipped, you'll receive a shipping confirmation email with a tracking number.</p>
+
+    <h2>Delivery Time</h2>
+    <p>It usually takes 1–3 business days to deliver. We do our best to ensure timely delivery of all orders — on rare occasions, packages can arrive outside the estimated time frame.</p>
+
+    <h2>Delivery Charges</h2>
+    <p>Delivery charges are calculated at checkout.</p>
+    <ul id="shippingList">
+      <li>Loading current rates…</li>
+    </ul>
+
+    <h2>Operating Hours</h2>
+    <p>Monday – Saturday: 9:00 AM to 6:00 PM (PKT)<br>We don't operate on Sundays or official holidays.</p>
+
+    <h2>Missed Delivery</h2>
+    <p>If there's a chance you won't be home to receive your order, contact our Customer Care team at <a href="tel:03303065888">0330 306 5888</a> to reschedule. If you've already missed the delivery appointment, an agent from our delivery partner will contact you by email or WhatsApp to inform you of the missed delivery and arrange a new delivery time.</p>
+
+    <h2>Order Cancellation Policy</h2>
+    <p>Orders can only be cancelled before they've shipped — once shipped, an order can't be cancelled. You can cancel an order by contacting us on WhatsApp at <a href="https://wa.me/923303065888" target="_blank">0330 306 5888</a> or by emailing <a href="mailto:info@natrio.pk">info@natrio.pk</a>.</p>
+
+    <h2>Return &amp; Exchange Policy</h2>
+    <p><strong>Return or Exchange:</strong> Our policy lasts 7 days. If 7 days have passed since your purchase, unfortunately we can't offer a refund or exchange. To be eligible for a return, your item must be unused and in the same condition you received it. Return shipping charges must be paid by you.</p>
+    <p><strong>Refund for Damaged Items:</strong> If you receive a damaged item, take photos of the product and send them via WhatsApp to our customer service team at <a href="https://wa.me/923303065888" target="_blank">0330 306 5888</a> within 24 hours. You'll receive a full refund or a replacement product.</p>
+
+    <div class="note-box">
+      <strong>Please note:</strong> our return policy doesn't apply to far/remote regions.
+    </div>
+  </div>
+
+  <script src="/script.js"></script>
+  <script>
+    fetch('/api/shipping').then(r => r.json()).then(methods => {
+      const list = document.getElementById('shippingList');
+      if (!methods.length) {
+        list.innerHTML = '<li>Please contact us for current shipping rates.</li>';
+        return;
+      }
+      list.innerHTML = methods.map(m => `
+        <li><strong>${m.name}</strong>${m.description ? ` (${m.description})` : ''} — Rs. ${Number(m.cost).toLocaleString()}${m.freeThreshold ? `, free for orders above Rs. ${Number(m.freeThreshold).toLocaleString()}` : ''}</li>
+      `).join('');
+    });
+  </script>
+</body>
+</html>

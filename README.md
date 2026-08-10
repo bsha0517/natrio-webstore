@@ -5,11 +5,13 @@ platform fees. Full control over your data, design, and checkout flow.
 
 ## What's included
 - Homepage, product listing, product detail, cart, checkout, order confirmation
+- About Us and Contact Us pages, plus Privacy Policy and Shipping/Returns policy pages
 - Customer accounts: sign up / log in / log out, with order history and a visual order-status tracker at `/account.html`
+- Contact form that saves messages and (optionally) emails you directly
 - Server-side cart (session based) and orders saved to `data/orders.json`
-- Cash on Delivery checkout working out of the box
+- Cash on Delivery checkout working out of the box, with admin-editable shipping methods and rates
 - Placeholder options for Card / JazzCash / Easypaisa (need merchant setup — see below)
-- Admin panel at `/admin.html` (password-protected) to view/update orders, manage the homepage hero slider, and manage category cards
+- Admin panel at `/admin.html` (password-protected) to view/update orders, manage the homepage hero slider, categories, shipping methods, and view contact messages
 
 ## 1. Run it locally (to preview before going live)
 
@@ -75,9 +77,32 @@ products.
 ## 6. View orders (admin)
 
 Go to **/admin.html**, log in with the password set in `ADMIN_PASSWORD`
-(default: `natrio-admin-2026` — **change this before going live**, see step 8).
+(default: `natrio-admin-2026` — **change this before going live**, see step 9).
 
-## 7. Deploying to Render.com (recommended)
+## 7. Contact form emails
+
+The Contact Us page (`/contact-us.html`) saves every message to
+`data/messages.json` (viewable in `/admin.html` → **Messages** tab) and,
+if configured, also emails you directly using Gmail.
+
+**To turn on email sending:**
+1. Use a Gmail account you're happy to send from (a dedicated one is fine).
+2. Go to your Google Account → **Security** → turn on **2-Step Verification**
+   if it isn't already on.
+3. Go to **Security** → **App passwords**, create one for "Mail", and copy
+   the 16-character password it gives you.
+4. Add two environment variables wherever you deploy (see the Render section
+   below for how):
+   - `SMTP_USER` — your Gmail address
+   - `SMTP_PASS` — the app password from step 3 (not your normal Gmail password)
+5. Optionally set `CONTACT_EMAIL` to a different address if you want form
+   submissions sent somewhere other than `info@natrio.pk`.
+
+If you skip this setup, the contact form still works and messages are still
+saved — you'll just need to check the admin **Messages** tab instead of
+your inbox.
+
+## 8. Deploying to Render.com (recommended)
 
 Render runs your app as a normal, always-on Node.js server — not a
 serverless function — so this project works there with **no code changes**.
@@ -91,7 +116,8 @@ serverless function — so this project works there with **no code changes**.
    and pre-fill the build command (`npm install`) and start command (`npm start`).
 4. When prompted, set the `ADMIN_PASSWORD` environment variable to something
    only you know (this protects `/admin.html`). `SESSION_SECRET` is generated
-   for you automatically.
+   for you automatically. If you've set up Gmail sending (see step 7), also
+   add `SMTP_USER`, `SMTP_PASS`, and optionally `CONTACT_EMAIL` here.
 5. Click **Deploy**. After a couple of minutes you'll get a live URL like
    `natrio-store.onrender.com`.
 6. To use your own domain (natrio.pk), go to your Render service → **Settings**
@@ -118,14 +144,14 @@ cart sessions in memory the way this project expects — that's what caused
 the `FUNCTION_INVOCATION_FAILED` error. Render (and Railway) don't have
 this limitation.
 
-## 8. Before going live — security checklist
+## 9. Before going live — security checklist
 
 - [ ] Change `ADMIN_PASSWORD` (set as an environment variable, don't hardcode)
 - [ ] Change `SESSION_SECRET` to a long random string
 - [ ] Set up HTTPS (Railway/Render provide this automatically; a VPS needs Let's Encrypt/Certbot)
 - [ ] Back up `data/orders.json`, `data/products.json`, and `data/users.json` regularly — `users.json` holds hashed customer passwords, so treat it as sensitive
 
-## 9. Payments — going beyond Cash on Delivery
+## 10. Payments — going beyond Cash on Delivery
 
 Cash on Delivery works immediately with no setup. For card / JazzCash /
 Easypaisa, you need a merchant account with that provider, then wire their
@@ -142,7 +168,7 @@ This is genuinely the part of the project that benefits most from a
 developer's help for a few hours — payment integrations involve handling
 webhooks and verifying signatures correctly for security.
 
-## 10. Project structure
+## 11. Project structure
 
 ```
 natrio-store/
@@ -162,7 +188,7 @@ natrio-store/
     script.js                       → shared header/footer + cart logic
 ```
 
-## 11. Customizing the look
+## 12. Customizing the look
 
 All colors, fonts, and spacing live in `public/style.css` at the top under
 `:root { ... }`. Change `--olive`, `--gold`, `--cream` to shift the palette

@@ -3,6 +3,7 @@ const session = require('express-session');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
@@ -14,16 +15,49 @@ const CATEGORIES_FILE = path.join(__dirname, 'data', 'categories.json');
 const BLOG_FILE = path.join(__dirname, 'data', 'blog.json');
 const HERO_FILE = path.join(__dirname, 'data', 'hero.json');
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
+const SHIPPING_FILE = path.join(__dirname, 'data', 'shipping.json');
+const MESSAGES_FILE = path.join(__dirname, 'data', 'messages.json');
 
-// make sure orders.json / users.json exist
+// make sure orders.json / users.json / messages.json exist
 if (!fs.existsSync(ORDERS_FILE)) fs.writeFileSync(ORDERS_FILE, '[]');
 if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '[]');
+if (!fs.existsSync(MESSAGES_FILE)) fs.writeFileSync(MESSAGES_FILE, '[]');
 
 function readJSON(file) {
   return JSON.parse(fs.readFileSync(file, 'utf-8'));
 }
 function writeJSON(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
+
+// ---------- Email (optional — only sends if SMTP_USER / SMTP_PASS are set) ----------
+const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'info@natrio.pk';
+let mailTransporter = null;
+if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+  mailTransporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+  });
+}
+
+async function sendContactEmail(message) {
+  if (!mailTransporter) {
+    console.log('Email not configured (SMTP_USER/SMTP_PASS missing) — message saved but not emailed.');
+    return false;
+  }
+  try {
+    await mailTransporter.sendMail({
+      from: `"Natrio Organics Website" <${process.env.SMTP_USER}>`,
+      to: CONTACT_EMAIL,
+      replyTo: message.email,
+      subject: `New message from ${message.name} — Natrio Organics site`,
+      text: `Name: ${message.name}\nEmail: ${message.email}\nPhone: ${message.phone || 'N/A'}\n\nMessage:\n${message.message}`
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to send contact email:', err.message);
+    return false;
+  }
 }
 
 app.use(express.json());
@@ -146,6 +180,33 @@ app.get('/api/hero', (req, res) => {
   res.json(readJSON(HERO_FILE));
 });
 
+app.get('/api/shipping', (req, res) => {
+  res.json(readJSON(SHIPPING_FILE));
+});
+
+app.post('/api/contact', async (req, res) => {
+  const { name, email, phone, message } = req.body;
+  if (!name || !email || !message) {
+    return res.status(400).json({ error: 'Name, email, and message are required' });
+  }
+
+  const entry = {
+    id: uuidv4().slice(0, 8),
+    name, email, phone: phone || '',
+    message,
+    date: new Date().toISOString(),
+    emailed: false
+  };
+
+  entry.emailed = await sendContactEmail(entry);
+
+  const messages = readJSON(MESSAGES_FILE);
+  messages.push(entry);
+  writeJSON(MESSAGES_FILE, messages);
+
+  res.json({ success: true });
+});
+
 // ---------- CART ROUTES ----------
 app.get('/api/cart', (req, res) => {
   const cart = getCart(req);
@@ -192,7 +253,7 @@ app.post('/api/cart/remove', (req, res) => {
 
 // ---------- CHECKOUT / ORDER ROUTES ----------
 app.post('/api/checkout', (req, res) => {
-  const { name, email, phone, address, city, paymentMethod, notes } = req.body;
+  const { name, email, phone, address, city, paymentMethod, shippingMethodId, notes } = req.body;
   const cart = getCart(req);
   if (!cart.length) return res.status(400).json({ error: 'Cart is empty' });
   if (!name || !phone || !address || !city) {
@@ -211,7 +272,11 @@ app.post('/api/checkout', (req, res) => {
     };
   });
   const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0);
-  const shipping = subtotal >= 2500 ? 0 : 200;
+
+  const shippingMethods = readJSON(SHIPPING_FILE);
+  const method = shippingMethods.find(m => m.id === shippingMethodId) || shippingMethods[0];
+  if (!method) return res.status(400).json({ error: 'No shipping method available. Please contact the store.' });
+  const shipping = (method.freeThreshold && subtotal >= method.freeThreshold) ? 0 : method.cost;
   const total = subtotal + shipping;
 
   const order = {
@@ -221,6 +286,7 @@ app.post('/api/checkout', (req, res) => {
     customer: { name, email, phone, address, city },
     items,
     subtotal,
+    shippingMethod: method.name,
     shipping,
     total,
     paymentMethod: paymentMethod || 'cod',
@@ -264,6 +330,10 @@ app.post('/api/admin/login', (req, res) => {
 
 app.get('/api/admin/orders', requireAdmin, (req, res) => {
   res.json(readJSON(ORDERS_FILE));
+});
+
+app.get('/api/admin/messages', requireAdmin, (req, res) => {
+  res.json(readJSON(MESSAGES_FILE).slice().reverse());
 });
 
 app.put('/api/admin/orders/:id/status', requireAdmin, (req, res) => {
@@ -321,6 +391,28 @@ app.delete('/api/admin/categories/:index', requireAdmin, (req, res) => {
   categories.splice(idx, 1);
   writeJSON(CATEGORIES_FILE, categories);
   res.json({ success: true });
+});
+
+app.get('/api/admin/shipping', requireAdmin, (req, res) => {
+  res.json(readJSON(SHIPPING_FILE));
+});
+
+app.put('/api/admin/shipping', requireAdmin, (req, res) => {
+  const methods = req.body.methods;
+  if (!Array.isArray(methods)) return res.status(400).json({ error: 'methods must be an array' });
+  if (methods.length < 1) return res.status(400).json({ error: 'At least one shipping method is required' });
+
+  for (const m of methods) {
+    if (!m.name || m.cost === undefined || m.cost === null || isNaN(Number(m.cost))) {
+      return res.status(400).json({ error: 'Each method needs a name and a numeric cost' });
+    }
+    if (!m.id) m.id = m.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || uuidv4().slice(0, 8);
+    m.cost = Number(m.cost);
+    m.freeThreshold = m.freeThreshold === '' || m.freeThreshold === undefined ? null : Number(m.freeThreshold);
+  }
+
+  writeJSON(SHIPPING_FILE, methods);
+  res.json({ success: true, methods });
 });
 
 app.get('/api/admin/hero', requireAdmin, (req, res) => {
