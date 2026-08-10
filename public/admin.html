@@ -934,7 +934,7 @@
           <div class="form-grid">
             <div>
               <label>Image path</label>
-              <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: square, 800×800px (matches how Instagram posts are usually cropped)</p>
+              <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: portrait, 1080×1440px (3:4 ratio, matches Instagram's standard post crop)</p>
               <input id="instaImage${i}" value="${p.image || ''}" onchange="updateInstagramField(${i},'image',this.value)" placeholder="/images/insta-1.jpg">
               <input type="file" accept="image/*" onchange="handleImageUpload(this, 'instaImage${i}')" style="margin-top:6px;font-size:12px;">
               <span id="instaImage${i}_status" style="font-size:12px;"></span>
