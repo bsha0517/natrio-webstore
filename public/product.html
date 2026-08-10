@@ -163,7 +163,7 @@
         '@context': 'https://schema.org',
         '@type': 'Product',
         name: p.title,
-        image: imgUrl,
+        image: [p.image, p.hoverImage, p.image3, p.image4].filter(Boolean).map(src => `https://natrio.pk${src}`),
         description: shortDesc || p.title,
         sku: p.sku || p.id,
         brand: { '@type': 'Brand', name: 'Natrio Organics' },
@@ -184,7 +184,7 @@
         <span class="current">${p.title}</span>
       `;
 
-      const gallery = [p.image, p.hoverImage].filter(Boolean);
+      const gallery = [p.image, p.hoverImage, p.image3, p.image4].filter(Boolean);
       const stockNote = p.stock === 0
         ? `<div class="stock-note out">Out of stock</div>`
         : p.stock <= 15

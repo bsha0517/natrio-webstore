@@ -119,11 +119,31 @@
           </div>
           <div>
             <label>Main image path</label>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: square, 1000×1000px. Shown everywhere — cards, homepage, product page.</p>
             <input id="prodImage" placeholder="/images/olive-hair-oil.jpg">
+            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'prodImage')" style="margin-top:6px;font-size:12px;">
+            <span id="prodImage_status" style="font-size:12px;"></span>
           </div>
           <div>
             <label>Hover image path (optional)</label>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: square, 1000×1000px. Swaps in on mouse-over on product cards.</p>
             <input id="prodHoverImage" placeholder="/images/olive-hair-oil-alt.jpg">
+            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'prodHoverImage')" style="margin-top:6px;font-size:12px;">
+            <span id="prodHoverImage_status" style="font-size:12px;"></span>
+          </div>
+          <div>
+            <label>3rd image path (optional)</label>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: square, 1000×1000px. Only appears in the product page gallery.</p>
+            <input id="prodImage3" placeholder="/images/olive-hair-oil-3.jpg">
+            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'prodImage3')" style="margin-top:6px;font-size:12px;">
+            <span id="prodImage3_status" style="font-size:12px;"></span>
+          </div>
+          <div>
+            <label>4th image path (optional)</label>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: square, 1000×1000px. Only appears in the product page gallery.</p>
+            <input id="prodImage4" placeholder="/images/olive-hair-oil-4.jpg">
+            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'prodImage4')" style="margin-top:6px;font-size:12px;">
+            <span id="prodImage4_status" style="font-size:12px;"></span>
           </div>
           <div class="full">
             <label>Ingredients (optional)</label>
@@ -284,7 +304,10 @@
           </div>
           <div class="full">
             <label>Image path</label>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: landscape, 1200×675px (16:9)</p>
             <input id="blogImage" placeholder="/images/blog-dandruff.jpg">
+            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'blogImage')" style="margin-top:6px;font-size:12px;">
+            <span id="blogImage_status" style="font-size:12px;"></span>
           </div>
           <div class="full">
             <label>Excerpt (short summary shown on cards)</label>
@@ -319,6 +342,36 @@
 
   <script>
     function money(n) { return 'Rs. ' + Number(n).toLocaleString(); }
+
+    // ---------- Shared image upload helper ----------
+    // Used everywhere an "image path" field appears — uploads to MongoDB
+    // via /api/admin/upload, then fills in the given text input with the
+    // returned URL and fires a change event so any existing onchange
+    // handler on that field (e.g. updateCategoryField) still runs.
+    async function handleImageUpload(fileInput, targetInputId) {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const statusEl = document.getElementById(targetInputId + '_status');
+      const formData = new FormData();
+      formData.append('image', file);
+      try {
+        if (statusEl) { statusEl.style.color = 'var(--muted)'; statusEl.textContent = 'Uploading…'; }
+        const res = await fetch('/api/admin/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.error) {
+          if (statusEl) { statusEl.style.color = '#a33'; statusEl.textContent = data.error; }
+          return;
+        }
+        const target = document.getElementById(targetInputId);
+        target.value = data.url;
+        target.dispatchEvent(new Event('change'));
+        if (statusEl) { statusEl.style.color = 'var(--olive)'; statusEl.textContent = 'Uploaded ✓'; }
+      } catch (err) {
+        if (statusEl) { statusEl.style.color = '#a33'; statusEl.textContent = 'Upload failed — try again.'; }
+      } finally {
+        fileInput.value = '';
+      }
+    }
 
     async function login() {
       const password = document.getElementById('pw').value;
@@ -508,6 +561,8 @@
       document.getElementById('prodDescription').value = '';
       document.getElementById('prodImage').value = '';
       document.getElementById('prodHoverImage').value = '';
+      document.getElementById('prodImage3').value = '';
+      document.getElementById('prodImage4').value = '';
       document.getElementById('prodIngredients').value = '';
       document.getElementById('prodHowToUse').value = '';
       document.getElementById('prodBenefits').value = '';
@@ -536,6 +591,8 @@
       document.getElementById('prodDescription').value = p.description || '';
       document.getElementById('prodImage').value = p.image || '';
       document.getElementById('prodHoverImage').value = p.hoverImage || '';
+      document.getElementById('prodImage3').value = p.image3 || '';
+      document.getElementById('prodImage4').value = p.image4 || '';
       document.getElementById('prodIngredients').value = p.ingredients || '';
       document.getElementById('prodHowToUse').value = p.howToUse || '';
       document.getElementById('prodBenefits').value = p.benefits || '';
@@ -559,6 +616,8 @@
         description: document.getElementById('prodDescription').value.trim(),
         image: document.getElementById('prodImage').value.trim(),
         hoverImage: document.getElementById('prodHoverImage').value.trim(),
+        image3: document.getElementById('prodImage3').value.trim(),
+        image4: document.getElementById('prodImage4').value.trim(),
         ingredients: document.getElementById('prodIngredients').value.trim(),
         howToUse: document.getElementById('prodHowToUse').value.trim(),
         benefits: document.getElementById('prodBenefits').value.trim(),
@@ -616,7 +675,10 @@
             </div>
             <div>
               <label>Image path</label>
-              <input value="${c.image || ''}" onchange="updateCategoryField(${i},'image',this.value)" placeholder="/images/category-x.jpg">
+              <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: square, 800×800px</p>
+              <input id="catImage${i}" value="${c.image || ''}" onchange="updateCategoryField(${i},'image',this.value)" placeholder="/images/category-x.jpg">
+              <input type="file" accept="image/*" onchange="handleImageUpload(this, 'catImage${i}')" style="margin-top:6px;font-size:12px;">
+              <span id="catImage${i}_status" style="font-size:12px;"></span>
             </div>
           </div>
         </div>
@@ -838,7 +900,10 @@
           <div class="form-grid">
             <div>
               <label>Image path</label>
-              <input value="${p.image || ''}" onchange="updateInstagramField(${i},'image',this.value)" placeholder="/images/insta-1.jpg">
+              <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: square, 800×800px (matches how Instagram posts are usually cropped)</p>
+              <input id="instaImage${i}" value="${p.image || ''}" onchange="updateInstagramField(${i},'image',this.value)" placeholder="/images/insta-1.jpg">
+              <input type="file" accept="image/*" onchange="handleImageUpload(this, 'instaImage${i}')" style="margin-top:6px;font-size:12px;">
+              <span id="instaImage${i}_status" style="font-size:12px;"></span>
             </div>
             <div>
               <label>Link to the actual post</label>
@@ -1077,7 +1142,10 @@
           <div class="form-grid">
             <div class="full">
               <label>Image path</label>
-              <input value="${s.image || ''}" onchange="updateHeroField(${i},'image',this.value)" placeholder="/images/hero-1.jpg">
+              <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: wide banner, 1920×800px</p>
+              <input id="heroImage${i}" value="${s.image || ''}" onchange="updateHeroField(${i},'image',this.value)" placeholder="/images/hero-1.jpg">
+              <input type="file" accept="image/*" onchange="handleImageUpload(this, 'heroImage${i}')" style="margin-top:6px;font-size:12px;">
+              <span id="heroImage${i}_status" style="font-size:12px;"></span>
             </div>
             <div>
               <label>Eyebrow text</label>

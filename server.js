@@ -5,6 +5,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { MongoClient } = require('mongodb');
+const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
@@ -569,6 +570,48 @@ function requireAdmin(req, res, next) {
   res.status(401).json({ error: 'Not authorized' });
 }
 
+// ---------- Image uploads (stored in MongoDB, not local disk) ----------
+// Local disk isn't safe to store uploads on — Render wipes it on every
+// redeploy, same reason we moved the rest of the data to MongoDB. Images
+// go in their own collection here instead, and get served back out
+// through GET /uploads/:id below.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per image
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are allowed'));
+    }
+    cb(null, true);
+  }
+});
+
+app.post('/api/admin/upload', requireAdmin, (req, res) => {
+  upload.single('image')(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No file was uploaded' });
+
+    const id = uuidv4();
+    await db.collection('uploads').insertOne({
+      _id: id,
+      contentType: req.file.mimetype,
+      filename: req.file.originalname,
+      data: req.file.buffer,
+      uploadedAt: new Date().toISOString()
+    });
+
+    res.json({ success: true, url: `/uploads/${id}` });
+  });
+});
+
+app.get('/uploads/:id', async (req, res) => {
+  const doc = await db.collection('uploads').findOne({ _id: req.params.id });
+  if (!doc) return res.status(404).send('Not found');
+  res.set('Content-Type', doc.contentType);
+  res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  res.send(doc.data.buffer ? Buffer.from(doc.data.buffer) : doc.data);
+});
+
 // ---------- One-time seed data import ----------
 // Copies the original data/*.json files (bundled with the deployed code)
 // into MongoDB. Safe to run more than once — it just overwrites each
@@ -945,6 +988,8 @@ app.post('/api/admin/products', requireAdmin, async (req, res) => {
     description: description || '',
     image: req.body.image || '',
     hoverImage: req.body.hoverImage || '',
+    image3: req.body.image3 || '',
+    image4: req.body.image4 || '',
     variants,
     stock: stock !== undefined && stock !== '' ? Math.max(0, parseInt(stock)) : 0,
     featured: !!req.body.featured,

@@ -30,13 +30,39 @@ Then open **http://localhost:3000** in your browser. The server won't
 start without `MONGODB_URI` set — that's intentional, since there's no
 local file storage to fall back to anymore.
 
-## 2. Add your real product photos
+## 2. Adding photos (products, categories, hero slides, blog posts, Instagram)
 
-Put images in `public/images/` and reference them in each product's
-`"image"` field via `/admin.html` → **Products** tab (or, if you're editing
-`data/products.json` directly before your first migration to MongoDB, the
-same field name applies there too), e.g. `"/images/olive-hair-oil.jpg"`.
-If no image is set, a text placeholder is shown instead — nothing will break.
+Every place in `/admin.html` that has an "image path" field also has an
+**upload button right below it** now — pick a photo from your computer and
+it uploads directly, no GitHub or redeploy involved. This works for
+Products, Categories, the Hero Slider, Blog posts, and Instagram posts.
+
+**Products support up to 4 photos each:** Main, Hover (swaps in on
+mouse-over on product cards), and two more ("3rd image", "4th image") that
+only appear as extra thumbnails on the product page itself, for showing
+different angles or the product in use. All four are optional except the
+main one — leave any of them blank and no empty placeholder box shows up
+anywhere, they just don't appear.
+
+**Where uploaded photos actually live:** MongoDB, in a separate collection
+from your product/order data, alongside everything else — not on Render's
+local disk, which (as covered in the MongoDB section further down) gets
+wiped on every redeploy and wouldn't be safe for this. Your server then
+serves each photo back out at a URL like `/uploads/abc123...`, which is
+what gets saved into the "image path" field automatically once the upload
+finishes. You don't need to do anything with that URL yourself — it's
+filled in for you.
+
+A 5MB-per-image size limit is enforced to keep things reasonable — resize
+very large photos before uploading if you hit that limit.
+
+**The original approach still works too, if you prefer it:** images placed
+in `public/images/` and committed to GitHub are served the same way,
+useful if you're comfortable with that workflow or want images bundled
+with your code for any reason. Just paste the path (e.g.
+`/images/olive-hair-oil.jpg`) directly into the same field instead of
+using the upload button — both approaches produce a working image path,
+you can mix and match freely.
 
 ## 3. Managing products &amp; inventory (admin panel)
 
