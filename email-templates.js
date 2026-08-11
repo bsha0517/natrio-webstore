@@ -43,8 +43,8 @@ function wrapEmail({ preheader, bodyHtml }) {
 
           <!-- Header -->
           <tr>
-            <td align="center" style="background:${COLORS.oliveDark};padding:28px 24px;">
-              <img src="${LOGO_URL}" alt="Natrio Organics" width="72" style="display:block;margin:0 auto;">
+            <td align="center" style="background:${COLORS.white};padding:28px 24px;border-bottom:2px solid ${COLORS.line};">
+              <img src="${LOGO_URL}" alt="Natrio Organics" width="90" style="display:block;margin:0 auto;">
             </td>
           </tr>
 
