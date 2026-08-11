@@ -169,14 +169,12 @@ async function sendOrderConfirmationEmails(order) {
     });
   }
 
-  // email to the store owner (plain text is fine for this one — it's for you, not a customer)
-  const itemsText = orderItemsText(order);
-  const summary = `Order #${order.id}\n\nItems:\n${itemsText}\n\nSubtotal: Rs. ${order.subtotal}${order.discountAmount ? `\nDiscount (${order.discountCode}): -Rs. ${order.discountAmount}` : ''}\nShipping (${order.shippingMethod}): ${order.shipping === 0 ? 'Free' : 'Rs. ' + order.shipping}\nTotal: Rs. ${order.total}\n\nPayment method: ${order.paymentMethod.toUpperCase()}\n\nDelivery to:\n${order.customer.name}\n${order.customer.address}\n${order.customer.city}\nPhone: ${order.customer.phone}`;
+  // email to the store owner
   await sendMailSafe({
     from: `"Natrio Organics Website" <${SENDER_EMAIL}>`,
     to: CONTACT_EMAIL,
     subject: `New order #${order.id} — Rs. ${order.total}`,
-    text: `A new order was placed.\n\n${summary}\n\nCustomer email: ${order.customer.email || 'not provided'}`
+    html: emailTemplates.newOrderOwnerEmail(order)
   });
 }
 

@@ -314,6 +314,34 @@ function reviewRequestEmail(order, recommendedProducts, reviewUrl) {
   return wrapEmail({ preheader: `How was your Natrio Organics order?`, bodyHtml });
 }
 
+// ==================== EMAIL 8: New Order Alert (to store owner) ====================
+function newOrderOwnerEmail(order) {
+  const adminUrl = `${SITE_URL}/admin.html`;
+  const paymentNote = order.paymentMethod !== 'cod'
+    ? (order.paymentVerified
+        ? `<span style="color:${COLORS.olive};">✅ Payment verified</span>`
+        : `<span style="color:#A33;font-weight:bold;">⚠️ Payment screenshot uploaded — needs verification before you ship this</span>`)
+    : '';
+
+  const bodyHtml = `
+    ${statusBadge('New Order', COLORS.gold)}
+    ${heading(`Rs. ${Number(order.total).toLocaleString()} — Order #${esc(order.id)}`)}
+    ${paragraph(`A new order just came in.`)}
+    ${orderItemsTable(order)}
+    ${addressBlock(order)}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">
+      <tr>
+        <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:${COLORS.ink};line-height:1.9;">
+          <strong style="color:${COLORS.oliveDark};">Payment method:</strong> ${esc((order.paymentMethod || 'cod').toUpperCase())}${paymentNote ? `<br>${paymentNote}` : ''}<br>
+          <strong style="color:${COLORS.oliveDark};">Customer email:</strong> ${esc(order.customer.email) || 'not provided'}
+        </td>
+      </tr>
+    </table>
+    ${button('View in Admin Panel', adminUrl)}
+  `;
+  return wrapEmail({ preheader: `New order #${order.id} — Rs. ${Number(order.total).toLocaleString()}`, bodyHtml });
+}
+
 module.exports = {
   orderPlacedEmail,
   orderCancelledEmail,
@@ -321,5 +349,6 @@ module.exports = {
   orderDeliveredEmail,
   welcomeSubscriberEmail,
   abandonedCartEmail,
-  reviewRequestEmail
+  reviewRequestEmail,
+  newOrderOwnerEmail
 };
