@@ -262,9 +262,64 @@ function orderDeliveredEmail(order, recommendedProducts) {
   return wrapEmail({ preheader: `Your order #${order.id} has been delivered.`, bodyHtml });
 }
 
+// ==================== EMAIL 5: Newsletter Welcome ====================
+function welcomeSubscriberEmail(recommendedProducts) {
+  const bodyHtml = `
+    ${heading(`Welcome to Natrio Organics 🌿`)}
+    ${paragraph(`Thanks for joining the list! You'll be the first to hear about new arrivals, seasonal offers, and the occasional discount code — no spam, just the good stuff.`)}
+    ${paragraph(`In the meantime, here's a little inspiration to get you started:`)}
+    ${button('Start Shopping', `${SITE_URL}/products.html`)}
+    ${recommendationCards(recommendedProducts)}
+    ${paragraph(`Follow along on <a href="https://www.instagram.com/natrioorganics" style="color:${COLORS.olive};">Instagram</a> for behind-the-scenes and skincare tips.`)}
+  `;
+  return wrapEmail({ preheader: `Welcome to Natrio Organics — glad you're here!`, bodyHtml });
+}
+
+// ==================== EMAIL 6: Abandoned Cart Reminder ====================
+function abandonedCartEmail(cart, recommendedProducts) {
+  const rows = cart.items.map(i => `
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid ${COLORS.line};font-family:Arial,Helvetica,sans-serif;font-size:13.5px;color:${COLORS.ink};">
+        ${esc(i.title)}<br><span style="color:${COLORS.muted};font-size:12px;">${esc(i.variant)} &times; ${i.qty}</span>
+      </td>
+      <td align="right" style="padding:10px 0;border-bottom:1px solid ${COLORS.line};font-family:Arial,Helvetica,sans-serif;font-size:13.5px;color:${COLORS.ink};white-space:nowrap;">
+        ${money(i.price * i.qty)}
+      </td>
+    </tr>`).join('');
+
+  const bodyHtml = `
+    ${heading(`You left something behind 👀`)}
+    ${paragraph(`${cart.name ? `Hi ${esc(cart.name.split(' ')[0])}, y` : 'Y'}our cart is still waiting for you — these items haven't sold out yet, but we can't promise for how long.`)}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;">${rows}</table>
+    ${button('Complete Your Order', `${SITE_URL}/cart.html`)}
+    ${recommendationCards(recommendedProducts)}
+  `;
+  return wrapEmail({ preheader: `You left items in your Natrio Organics cart.`, bodyHtml });
+}
+
+// ==================== EMAIL 7: Review Request ====================
+function reviewRequestEmail(order, recommendedProducts, reviewUrl) {
+  const reviewSection = reviewUrl
+    ? button('Leave a Review', reviewUrl)
+    : paragraph(`Just reply to this email or message us on <a href="https://wa.me/923303065888" style="color:${COLORS.olive};">WhatsApp</a> and let us know what you think — we read every message.`);
+
+  const bodyHtml = `
+    ${heading(`How's everything going?`)}
+    ${paragraph(`Hi ${esc(order.customer.name.split(' ')[0])}, it's been a few days since order <strong>#${esc(order.id)}</strong> arrived — we'd love to know what you think!`)}
+    ${paragraph(`Your feedback genuinely helps us improve, and helps other customers know what to expect.`)}
+    ${reviewSection}
+    ${paragraph(`Loved it? Here's a little something for next time:`)}
+    ${recommendationCards(recommendedProducts)}
+  `;
+  return wrapEmail({ preheader: `How was your Natrio Organics order?`, bodyHtml });
+}
+
 module.exports = {
   orderPlacedEmail,
   orderCancelledEmail,
   orderShippedEmail,
-  orderDeliveredEmail
+  orderDeliveredEmail,
+  welcomeSubscriberEmail,
+  abandonedCartEmail,
+  reviewRequestEmail
 };

@@ -158,12 +158,22 @@ same Gmail SMTP setup as your contact form and order emails (see the
 section below if you haven't configured that yet). Every campaign email
 includes an unsubscribe link automatically.
 
-## 6. View orders (admin)
+## 6. Dashboard (admin)
+
+`/admin.html` now opens on a **Dashboard** tab by default — revenue and
+order counts for today, the last 7 days, the last 30 days, and all-time;
+how many orders are still pending action; how many products are low on
+stock (≤15) or completely out; and your top 5 best-selling products by
+units sold over the last 30 days. Cancelled orders are excluded from every
+revenue figure, since they were never real sales. Click the pending-orders
+or stock cards to jump straight to the relevant tab.
+
+## 7. View orders (admin)
 
 Go to **/admin.html**, log in with the password set in `ADMIN_PASSWORD`
-(default: `natrio-admin-2026` — **change this before going live**, see step 9).
+(default: `natrio-admin-2026` — **change this before going live**, see step 10).
 
-## 7. Email notifications
+## 8. Email notifications
 
 Emails are sent through **Brevo** (formerly Sendinblue), using their HTTP
 API — not traditional SMTP. This matters: Render blocks outbound SMTP
@@ -239,7 +249,7 @@ of your inbox.
 plenty for most stores starting out. Brevo's paid tiers remove the daily
 cap if you outgrow it later.
 
-## 8. Deploying to Render.com (recommended)
+## 9. Deploying to Render.com (recommended)
 
 Render runs your app as a normal, always-on Node.js server — not a
 serverless function — so this project works there with **no code changes**.
@@ -253,7 +263,7 @@ serverless function — so this project works there with **no code changes**.
    and pre-fill the build command (`npm install`) and start command (`npm start`).
 4. When prompted, set the `ADMIN_PASSWORD` environment variable to something
    only you know (this protects `/admin.html`). `SESSION_SECRET` is generated
-   for you automatically. If you've set up Brevo (see step 7), also add
+   for you automatically. If you've set up Brevo (see step 8), also add
    `BREVO_API_KEY`, `SENDER_EMAIL`, and `CONTACT_EMAIL` here.
 5. Click **Deploy**. After a couple of minutes you'll get a live URL like
    `natrio-store.onrender.com`.
@@ -358,14 +368,14 @@ cart sessions in memory the way this project expects — that's what caused
 the `FUNCTION_INVOCATION_FAILED` error. Render (and Railway) don't have
 this limitation.
 
-## 9. Before going live — security checklist
+## 10. Before going live — security checklist
 
 - [ ] Change `ADMIN_PASSWORD` (set as an environment variable, don't hardcode)
 - [ ] Change `SESSION_SECRET` to a long random string
 - [ ] Set up HTTPS (Railway/Render provide this automatically; a VPS needs Let's Encrypt/Certbot)
 - [ ] Back up `data/orders.json`, `data/products.json`, and `data/users.json` regularly — `users.json` holds hashed customer passwords, so treat it as sensitive
 
-## 10. Payments — going beyond Cash on Delivery
+## 11. Payments — going beyond Cash on Delivery
 
 Cash on Delivery works immediately with no setup. For card / JazzCash /
 Easypaisa, you need a merchant account with that provider, then wire their
@@ -382,7 +392,7 @@ This is genuinely the part of the project that benefits most from a
 developer's help for a few hours — payment integrations involve handling
 webhooks and verifying signatures correctly for security.
 
-## 11. Project structure
+## 12. Project structure
 
 ```
 natrio-store/
@@ -402,13 +412,13 @@ natrio-store/
     script.js                       → shared header/footer + cart logic
 ```
 
-## 12. Customizing the look
+## 13. Customizing the look
 
 All colors, fonts, and spacing live in `public/style.css` at the top under
 `:root { ... }`. Change `--olive`, `--gold`, `--cream` to shift the palette
 without touching any other file.
 
-## 13. SEO
+## 14. SEO
 
 The site now has proper SEO built in:
 
@@ -442,3 +452,80 @@ it to `https://natrio.pk`) and redeploy.
 [Bing Webmaster Tools](https://www.bing.com/webmasters) — that's what
 actually gets your pages crawled and indexed; none of the above happens
 automatically just by the sitemap existing.
+
+## 15. Store locations page
+
+Go to `/admin.html` → **Store Locations** tab to list the physical stores
+that carry Natrio Organics (currently seeded with Decent Store and Rainbow
+Hypermarket, both Lahore — add real addresses whenever you have them).
+Shown on `/find-us-in-store.html`, linked from the footer.
+
+## 16. Newsletter welcome emails
+
+Anyone who subscribes — through the footer form or the checkout opt-in
+checkbox — now automatically gets a branded welcome email the first time
+they join. Resubscribing or already being on the list won't send a second
+one. Uses the same Brevo setup as every other email (see section 7).
+
+## 17. Abandoned cart reminders
+
+The store now tracks carts that get left behind and sends one automatic
+reminder email if it has an address to send to.
+
+**How it works:**
+- Adding, updating, or removing something from a cart saves a snapshot
+  tied to that shopper's browser session.
+- An email gets attached to that snapshot as soon as we have one — either
+  because they're logged in, or because they've typed their email into the
+  checkout form (captured the moment they move to the next field, even if
+  they never finish checking out).
+- Every 15 minutes, the server checks for carts that have sat inactive for
+  **1 hour** with an email attached, and sends a one-time reminder with
+  the items they left and a link back to their cart. It won't send a
+  second reminder for the same cart.
+- Completing an order clears that cart's tracking entirely, so a finished
+  purchase never triggers a "you forgot something" email.
+
+**To view or manually manage this:** `/admin.html` → **Abandoned Carts**
+tab shows every tracked cart — email, items, subtotal, last activity, and
+status (active / reminded). You can send a reminder immediately regardless
+of the 1-hour wait, or dismiss a cart you don't want tracked anymore.
+
+**To change the 1-hour wait:** set the `ABANDONED_CART_HOURS` environment
+variable (e.g. `4` for a 4-hour delay) wherever you deploy.
+
+## 18. Trust badges
+
+Small "Cash on Delivery / 7-Day Returns / 100% Natural" badges now appear
+right above the Add to Cart button on every product page, and again above
+the Place Order button at checkout — right where someone's actually
+deciding whether to buy, not just buried in the footer. These are plain
+HTML/CSS, no admin config — edit the text directly in `product.html` and
+`checkout.html` if you want to change the wording.
+
+## 19. Post-purchase review requests
+
+A few days after you mark an order **delivered**, the customer
+automatically gets an email asking how it went — with a link straight to
+leaving a Google review if you've set one up (see **Settings** below), or
+a prompt to reply/WhatsApp you directly if you haven't. Checked hourly,
+sent once per order.
+
+**To change the wait time:** set the `REVIEW_REQUEST_DAYS` environment
+variable (default: `3`).
+
+## 20. Analytics & Settings
+
+`/admin.html` → **Settings** tab has two fields:
+
+- **Google Analytics Measurement ID** — paste your GA4 ID (looks like
+  `G-XXXXXXXXXX`, found in Google Analytics → Admin → Data Streams → your
+  website) and analytics loads automatically on every page, including a
+  `purchase` event fired on the order confirmation page with the real
+  order value and items — not just page views, actual conversion tracking.
+  Leave it blank and nothing loads; no performance cost either way.
+- **Google Review Link** — powers the review request email above. Get
+  yours from Google Business Profile → Ask for reviews → Copy link.
+
+Both are stored in the database and take effect immediately — no redeploy
+needed to turn analytics on/off or update your review link.

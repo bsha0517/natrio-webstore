@@ -19,12 +19,12 @@
       <form id="checkoutForm">
         <h3>Contact & Delivery</h3>
         <div class="form-grid">
-          <div><label>Full Name *</label><input name="name" required></div>
+          <div><label>Full Name *</label><input name="name" id="checkoutName" required></div>
           <div>
             <label>Phone *</label>
             <input name="phone" type="tel" required placeholder="03xx-xxxxxxx" pattern="^(03\d{9}|\+923\d{9})$" title="Enter a valid Pakistani mobile number, e.g. 03001234567">
           </div>
-          <div class="full"><label>Email *</label><input name="email" type="email" required></div>
+          <div class="full"><label>Email *</label><input name="email" id="checkoutEmail" type="email" required></div>
           <div class="full"><label>Address *</label><input name="address" required></div>
           <div>
             <label>City *</label>
@@ -91,7 +91,13 @@
           <span>Email me about offers, new arrivals, and updates from Natrio Organics.</span>
         </label>
 
-        <button type="submit" class="btn btn-primary btn-full" style="margin-top:20px;">Place Order</button>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:20px;">
+          <span style="display:inline-flex;align-items:center;gap:5px;background:var(--cream-deep);border:1px solid var(--line);font-size:12px;color:var(--ink);padding:6px 11px;border-radius:20px;">🔒 Secure Checkout</span>
+          <span style="display:inline-flex;align-items:center;gap:5px;background:var(--cream-deep);border:1px solid var(--line);font-size:12px;color:var(--ink);padding:6px 11px;border-radius:20px;">↩️ 7-Day Returns</span>
+          <span style="display:inline-flex;align-items:center;gap:5px;background:var(--cream-deep);border:1px solid var(--line);font-size:12px;color:var(--ink);padding:6px 11px;border-radius:20px;">🌿 100% Natural</span>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full" style="margin-top:14px;">Place Order</button>
       </form>
     </div>
 
@@ -190,6 +196,19 @@
     }
 
     loadSummary().then(loadShippingMethods);
+
+    // Capture the shopper's email as soon as they've entered it — even if
+    // they never finish checkout, this lets us send a reminder about the
+    // items still sitting in their cart.
+    document.getElementById('checkoutEmail').addEventListener('blur', function() {
+      const email = this.value.trim();
+      if (!email || !/^\S+@\S+\.\S+$/.test(email)) return;
+      const name = document.getElementById('checkoutName').value.trim();
+      fetch('/api/cart/set-email', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name })
+      }).catch(() => {});
+    });
 
     // Pre-fill contact details if the shopper is logged in
     fetch('/api/auth/me').then(r => r.json()).then(data => {

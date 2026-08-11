@@ -94,19 +94,69 @@
     </div>
 
     <div class="tabs">
-      <div class="tab active" data-tab="orders">Orders</div>
+      <div class="tab active" data-tab="dashboard">Dashboard</div>
+      <div class="tab" data-tab="orders">Orders</div>
       <div class="tab" data-tab="products">Products</div>
       <div class="tab" data-tab="categories">Categories</div>
       <div class="tab" data-tab="shipping">Shipping</div>
       <div class="tab" data-tab="discounts">Discounts</div>
       <div class="tab" data-tab="instagram">Instagram</div>
+      <div class="tab" data-tab="stores">Store Locations</div>
+      <div class="tab" data-tab="abandoned">Abandoned Carts</div>
+      <div class="tab" data-tab="settings">Settings</div>
       <div class="tab" data-tab="hero">Hero Slider</div>
       <div class="tab" data-tab="blog">Blog</div>
       <div class="tab" data-tab="messages">Messages</div>
       <div class="tab" data-tab="marketing">Marketing</div>
     </div>
 
-    <div id="ordersTab">
+    <div id="dashboardTab">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:28px;">
+        <div style="background:white;border:1px solid var(--line);padding:16px 18px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Today</div>
+          <div id="statTodayRevenue" style="font-size:22px;font-weight:600;color:var(--olive-dark);">—</div>
+          <div id="statTodayOrders" style="font-size:12px;color:var(--muted);">—</div>
+        </div>
+        <div style="background:white;border:1px solid var(--line);padding:16px 18px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Last 7 Days</div>
+          <div id="stat7Revenue" style="font-size:22px;font-weight:600;color:var(--olive-dark);">—</div>
+          <div id="stat7Orders" style="font-size:12px;color:var(--muted);">—</div>
+        </div>
+        <div style="background:white;border:1px solid var(--line);padding:16px 18px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Last 30 Days</div>
+          <div id="stat30Revenue" style="font-size:22px;font-weight:600;color:var(--olive-dark);">—</div>
+          <div id="stat30Orders" style="font-size:12px;color:var(--muted);">—</div>
+        </div>
+        <div style="background:white;border:1px solid var(--line);padding:16px 18px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">All Time</div>
+          <div id="statAllRevenue" style="font-size:22px;font-weight:600;color:var(--olive-dark);">—</div>
+          <div id="statAllOrders" style="font-size:12px;color:var(--muted);">—</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:28px;">
+        <div id="statPendingBox" style="background:white;border:1px solid var(--gold);padding:14px 18px;cursor:pointer;" onclick="document.querySelector(\'[data-tab=orders]\').click()">
+          <div style="font-size:22px;font-weight:600;color:var(--gold);" id="statPending">—</div>
+          <div style="font-size:12px;color:var(--muted);">Pending orders — needs action</div>
+        </div>
+        <div id="statLowStockBox" style="background:white;border:1px solid var(--line);padding:14px 18px;cursor:pointer;" onclick="document.querySelector(\'[data-tab=products]\').click()">
+          <div style="font-size:22px;font-weight:600;color:var(--ink);" id="statLowStock">—</div>
+          <div style="font-size:12px;color:var(--muted);">Products low on stock (≤15)</div>
+        </div>
+        <div id="statOutBox" style="background:white;border:1px solid #F5D9D9;padding:14px 18px;cursor:pointer;" onclick="document.querySelector(\'[data-tab=products]\').click()">
+          <div style="font-size:22px;font-weight:600;color:#A33;" id="statOut">—</div>
+          <div style="font-size:12px;color:var(--muted);">Products out of stock</div>
+        </div>
+      </div>
+
+      <h3 style="margin-bottom:12px;">Top Products — Last 30 Days</h3>
+      <table>
+        <thead><tr><th>Product</th><th>Units Sold</th><th>Revenue</th></tr></thead>
+        <tbody id="topProductsBody"></tbody>
+      </table>
+    </div>
+
+    <div id="ordersTab" class="hidden">
       <table>
         <thead><tr><th>ID</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead>
         <tbody id="ordersBody"></tbody>
@@ -289,6 +339,37 @@
       <p id="instaSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
     </div>
 
+    <div id="storesTab" class="hidden">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">List the physical stores that carry Natrio Organics — shown on the "Find Us In Store" page.</p>
+      <div id="storeEditors"></div>
+      <button class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);margin-top:6px;" onclick="addStoreRow()">+ Add Store</button>
+      <button class="btn btn-primary" style="margin-top:6px;margin-left:10px;" onclick="saveStores()">Save Store Locations</button>
+      <p id="storeSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
+    </div>
+
+    <div id="abandonedTab" class="hidden">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Carts that have sat inactive for a while with an email attached get one automatic reminder email (checked every 15 minutes, currently after 1 hour of inactivity — configurable via the <code>ABANDONED_CART_HOURS</code> environment variable). You can also send a reminder manually anytime below.</p>
+      <table>
+        <thead><tr><th>Email</th><th>Items</th><th>Subtotal</th><th>Last Activity</th><th>Status</th><th></th></tr></thead>
+        <tbody id="abandonedBody"></tbody>
+      </table>
+    </div>
+
+    <div id="settingsTab" class="hidden">
+      <div style="border:1px solid var(--line);background:white;padding:20px;max-width:560px;">
+        <label>Google Analytics Measurement ID (optional)</label>
+        <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">From Google Analytics → Admin → Data Streams → your website stream. Looks like <code>G-XXXXXXXXXX</code>. Leave blank to disable analytics.</p>
+        <input id="settingsGaId" placeholder="G-XXXXXXXXXX">
+
+        <label style="margin-top:18px;">Google Review Link (optional)</label>
+        <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">The direct link customers get sent to when asked to leave a review, a few days after their order is delivered. Find yours via Google Business Profile → Ask for reviews → Copy link. If left blank, the review request email asks customers to reply or message you on WhatsApp instead.</p>
+        <input id="settingsReviewUrl" placeholder="https://g.page/r/.../review">
+
+        <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:18px;">Save Settings</button>
+        <p id="settingsSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
+      </div>
+    </div>
+
     <div id="heroTab" class="hidden">
       <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Add up to 3 hero slides. Only the image is required — the picture always displays at full size, uncropped. Heading, subtext, and button are all optional: leave them blank for a clean photo-only slide, or fill them in to overlay text on top. Slides rotate automatically every 6 seconds on the homepage.</p>
       <div id="heroSlideEditors"></div>
@@ -428,6 +509,7 @@
       if (res.ok) {
         document.getElementById('loginBox').classList.add('hidden');
         document.getElementById('adminWrap').classList.remove('hidden');
+        loadDashboard();
         loadOrders();
         loadProducts();
         loadHeroSlides();
@@ -435,6 +517,9 @@
         loadShippingMethods();
         loadDiscounts();
         loadInstagramPosts();
+        loadStores();
+        loadAbandonedCarts();
+        loadSettings();
         loadMessages();
         loadSubscribers();
         loadBlogPosts();
@@ -466,18 +551,47 @@
       tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
+        document.getElementById('dashboardTab').classList.toggle('hidden', tab.dataset.tab !== 'dashboard');
         document.getElementById('ordersTab').classList.toggle('hidden', tab.dataset.tab !== 'orders');
         document.getElementById('productsTab').classList.toggle('hidden', tab.dataset.tab !== 'products');
         document.getElementById('categoriesTab').classList.toggle('hidden', tab.dataset.tab !== 'categories');
         document.getElementById('shippingTab').classList.toggle('hidden', tab.dataset.tab !== 'shipping');
         document.getElementById('discountsTab').classList.toggle('hidden', tab.dataset.tab !== 'discounts');
         document.getElementById('instagramTab').classList.toggle('hidden', tab.dataset.tab !== 'instagram');
+        document.getElementById('storesTab').classList.toggle('hidden', tab.dataset.tab !== 'stores');
+        document.getElementById('abandonedTab').classList.toggle('hidden', tab.dataset.tab !== 'abandoned');
+        document.getElementById('settingsTab').classList.toggle('hidden', tab.dataset.tab !== 'settings');
         document.getElementById('heroTab').classList.toggle('hidden', tab.dataset.tab !== 'hero');
         document.getElementById('messagesTab').classList.toggle('hidden', tab.dataset.tab !== 'messages');
         document.getElementById('marketingTab').classList.toggle('hidden', tab.dataset.tab !== 'marketing');
         document.getElementById('blogTab').classList.toggle('hidden', tab.dataset.tab !== 'blog');
       });
     });
+
+    async function loadDashboard() {
+      const res = await fetch('/api/admin/dashboard');
+      const d = await res.json();
+
+      document.getElementById('statTodayRevenue').textContent = money(d.today.revenue);
+      document.getElementById('statTodayOrders').textContent = `${d.today.orders} order${d.today.orders === 1 ? '' : 's'}`;
+
+      document.getElementById('stat7Revenue').textContent = money(d.last7.revenue);
+      document.getElementById('stat7Orders').textContent = `${d.last7.orders} order${d.last7.orders === 1 ? '' : 's'}`;
+
+      document.getElementById('stat30Revenue').textContent = money(d.last30.revenue);
+      document.getElementById('stat30Orders').textContent = `${d.last30.orders} order${d.last30.orders === 1 ? '' : 's'}`;
+
+      document.getElementById('statAllRevenue').textContent = money(d.allTime.revenue);
+      document.getElementById('statAllOrders').textContent = `${d.allTime.orders} order${d.allTime.orders === 1 ? '' : 's'}`;
+
+      document.getElementById('statPending').textContent = d.pendingOrdersCount;
+      document.getElementById('statLowStock').textContent = d.lowStockCount;
+      document.getElementById('statOut').textContent = d.outOfStockCount;
+
+      document.getElementById('topProductsBody').innerHTML = d.topProducts.map(p => `
+        <tr><td>${p.title}</td><td>${p.qty}</td><td>${money(p.revenue)}</td></tr>
+      `).join('') || '<tr><td colspan="3">No sales in the last 30 days yet.</td></tr>';
+    }
 
     let allOrders = [];
 
@@ -1043,6 +1157,138 @@
         msg.textContent = 'Saved! Refresh the homepage to see the changes.';
         instagramPosts = data.posts;
         renderInstagramEditors();
+      }
+    }
+
+    // ---------- Store locations ----------
+    let stores = [];
+
+    async function loadStores() {
+      const res = await fetch('/api/admin/stores');
+      stores = await res.json();
+      renderStoreEditors();
+    }
+
+    function renderStoreEditors() {
+      document.getElementById('storeEditors').innerHTML = stores.map((s, i) => `
+        <div style="border:1px solid var(--line);background:white;padding:16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <strong>Store ${i + 1}</strong>
+            <span style="color:#a33;cursor:pointer;font-size:13px;" onclick="removeStoreRow(${i})">Remove</span>
+          </div>
+          <div class="form-grid">
+            <div>
+              <label>Store name</label>
+              <input value="${s.name || ''}" onchange="updateStoreField(${i},'name',this.value)" placeholder="e.g. Decent Store">
+            </div>
+            <div>
+              <label>City</label>
+              <input value="${s.city || ''}" onchange="updateStoreField(${i},'city',this.value)" placeholder="e.g. Lahore">
+            </div>
+            <div class="full">
+              <label>Address (optional)</label>
+              <input value="${s.address || ''}" onchange="updateStoreField(${i},'address',this.value)" placeholder="e.g. Branch address or area">
+            </div>
+          </div>
+        </div>
+      `).join('') || '<p style="color:var(--muted);font-size:13px;">No stores yet — add one below.</p>';
+    }
+
+    function updateStoreField(i, field, value) {
+      stores[i][field] = value;
+    }
+
+    function addStoreRow() {
+      stores.push({ name: '', city: 'Lahore', address: '' });
+      renderStoreEditors();
+    }
+
+    function removeStoreRow(i) {
+      stores.splice(i, 1);
+      renderStoreEditors();
+    }
+
+    async function saveStores() {
+      const res = await fetch('/api/admin/stores', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stores })
+      });
+      const data = await res.json();
+      const msg = document.getElementById('storeSaveMsg');
+      if (data.error) {
+        msg.style.color = '#a33';
+        msg.textContent = data.error;
+      } else {
+        msg.style.color = 'var(--olive)';
+        msg.textContent = 'Saved! Visible now on the Find Us In Store page.';
+        stores = data.stores;
+        renderStoreEditors();
+      }
+    }
+
+    // ---------- Abandoned carts ----------
+    async function loadAbandonedCarts() {
+      const res = await fetch('/api/admin/abandoned-carts');
+      const carts = await res.json();
+      document.getElementById('abandonedBody').innerHTML = carts.map(c => {
+        const subtotal = (c.items || []).reduce((sum, i) => sum + i.price * i.qty, 0);
+        const itemsSummary = (c.items || []).map(i => `${i.title} (${i.variant}) ×${i.qty}`).join('<br>');
+        const statusColors = { active: 'var(--gold)', reminded: 'var(--olive)' };
+        return `
+          <tr>
+            <td>${c.email || '<span style="color:var(--muted);">No email captured</span>'}${c.name ? `<br><span style="color:var(--muted);font-size:12px;">${c.name}</span>` : ''}</td>
+            <td style="white-space:normal;max-width:260px;">${itemsSummary}</td>
+            <td>${money(subtotal)}</td>
+            <td>${new Date(c.updatedAt).toLocaleString()}</td>
+            <td style="color:${statusColors[c.status] || 'var(--muted)'};text-transform:capitalize;">${c.status}${c.remindedAt ? `<br><span style="font-size:11px;color:var(--muted);">sent ${new Date(c.remindedAt).toLocaleDateString()}</span>` : ''}</td>
+            <td>
+              ${c.email ? `<span style="color:var(--olive);cursor:pointer;margin-right:12px;" onclick="sendAbandonedReminder('${c.sessionId}')">Send Reminder</span>` : ''}
+              <span style="color:#a33;cursor:pointer;" onclick="dismissAbandonedCart('${c.sessionId}')">Dismiss</span>
+            </td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="6">No abandoned carts yet.</td></tr>';
+    }
+
+    async function sendAbandonedReminder(sessionId) {
+      const res = await fetch(`/api/admin/abandoned-carts/${sessionId}/remind`, { method: 'POST' });
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      alert('Reminder sent!');
+      loadAbandonedCarts();
+    }
+
+    async function dismissAbandonedCart(sessionId) {
+      if (!confirm('Remove this from the abandoned carts list?')) return;
+      await fetch(`/api/admin/abandoned-carts/${sessionId}`, { method: 'DELETE' });
+      loadAbandonedCarts();
+    }
+
+    // ---------- Settings ----------
+    async function loadSettings() {
+      const res = await fetch('/api/admin/settings');
+      const settings = await res.json();
+      document.getElementById('settingsGaId').value = settings.gaTrackingId || '';
+      document.getElementById('settingsReviewUrl').value = settings.googleReviewUrl || '';
+    }
+
+    async function saveSettings() {
+      const payload = {
+        gaTrackingId: document.getElementById('settingsGaId').value.trim(),
+        googleReviewUrl: document.getElementById('settingsReviewUrl').value.trim()
+      };
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      const msg = document.getElementById('settingsSaveMsg');
+      if (data.error) {
+        msg.style.color = '#a33';
+        msg.textContent = data.error;
+      } else {
+        msg.style.color = 'var(--olive)';
+        msg.textContent = 'Saved!';
       }
     }
 

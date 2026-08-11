@@ -51,6 +51,13 @@
     .qty-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
     .qty-row label { margin-bottom: 0; }
 
+    .trust-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .trust-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: var(--cream-deep); border: 1px solid var(--line);
+      font-size: 12px; color: var(--ink); padding: 6px 11px; border-radius: 20px;
+      font-family: 'Jost', sans-serif;
+    }
     .pd-actions { display: flex; gap: 10px; margin-bottom: 14px; }
     .pd-actions .btn-primary { flex: 1; }
     .icon-square {
@@ -244,6 +251,12 @@
             </div>
           </div>
 
+          <div class="trust-badges">
+            <span class="trust-badge">💵 Cash on Delivery</span>
+            <span class="trust-badge">↩️ 7-Day Returns</span>
+            <span class="trust-badge">🌿 100% Natural</span>
+          </div>
+
           <div class="pd-actions">
             <button class="btn btn-primary" id="addBtn" ${p.stock === 0 ? 'disabled' : ''}>
               ${p.stock === 0 ? 'Out of Stock' : `Add to Cart — ${money(variants[0].price)}`}
@@ -254,7 +267,7 @@
 
           <div class="pd-info-rows">
             <div class="pd-info-row"><span class="ic">🚚</span><div class="txt"><strong>Free shipping over Rs. 2500</strong><span>Cash on Delivery available nationwide</span></div></div>
-            <div class="pd-info-row"><span class="ic">↩️</span><div class="txt"><strong>15-day exchange window</strong><span>Easy returns if something's not right</span></div></div>
+            <div class="pd-info-row"><span class="ic">↩️</span><div class="txt"><strong>7-day exchange window</strong><span>Easy returns if something's not right</span></div></div>
             <div class="pd-info-row"><span class="ic">🌿</span><div class="txt"><strong>Cold-pressed, chemical free</strong><span>Made in small batches for freshness</span></div></div>
           </div>
         </div>

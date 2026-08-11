@@ -33,6 +33,23 @@
         <p style="margin-top:20px;font-size:13px;color:var(--muted);">Payment method: ${order.paymentMethod.toUpperCase()}. We'll contact you at ${order.customer.phone} to confirm delivery.</p>
         <a href="/" class="btn btn-dark" style="margin-top:20px;">Back to Home</a>
       `;
+
+      // report the completed sale to Google Analytics, if it's configured
+      if (window.gtag) {
+        gtag('event', 'purchase', {
+          transaction_id: order.id,
+          value: order.total,
+          currency: 'PKR',
+          shipping: order.shipping,
+          items: order.items.map(i => ({
+            item_id: i.productId,
+            item_name: i.title,
+            item_variant: i.variant,
+            price: i.price,
+            quantity: i.qty
+          }))
+        });
+      }
     });
   </script>
 </body>

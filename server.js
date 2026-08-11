@@ -26,6 +26,9 @@ const SHIPPING_FILE = 'shipping';
 const DISCOUNTS_FILE = 'discounts';
 const INSTAGRAM_FILE = 'instagram';
 const SUBSCRIBERS_FILE = 'subscribers';
+const STORES_FILE = 'stores';
+const CART_ACTIVITY_FILE = 'cartActivity';
+const SETTINGS_FILE = 'settings';
 const MESSAGES_FILE = 'messages';
 
 // ---------- MongoDB connection ----------
@@ -281,6 +284,154 @@ function getCart(req) {
   return req.session.cart;
 }
 
+// ---------- Abandoned cart tracking ----------
+// Every time the cart changes, we save a snapshot tied to this browser's
+// session, along with an email if we have one (either a logged-in
+// customer, or a guest who's typed their email into the checkout form —
+// see POST /api/cart/set-email). A background sweep later finds carts
+// that have sat untouched for a while with an email attached and sends a
+// one-time reminder.
+async function syncCartActivity(req) {
+  try {
+    const cart = getCart(req);
+    const activity = await readJSON(CART_ACTIVITY_FILE);
+    const sessionId = req.sessionID;
+
+    if (!cart.length) {
+      // cart emptied out (checked out, or manually cleared) — nothing to remind about
+      const idx = activity.findIndex(a => a.sessionId === sessionId);
+      if (idx !== -1) { activity.splice(idx, 1); await writeJSON(CART_ACTIVITY_FILE, activity); }
+      return;
+    }
+
+    let email = req.session.cartEmail || null;
+    let name = req.session.cartName || null;
+    if (!email && req.session.userId) {
+      const users = await readJSON(USERS_FILE);
+      const user = users.find(u => u.id === req.session.userId);
+      if (user) { email = user.email; name = user.name; }
+    }
+
+    const products = await readJSON(PRODUCTS_FILE);
+    const items = cart.map(item => {
+      const product = products.find(p => p.id === item.productId);
+      return {
+        productId: item.productId,
+        title: product ? product.title : 'Unknown',
+        variant: item.variant,
+        qty: item.qty,
+        price: getVariantPrice(product, item.variant),
+        image: product ? product.image : ''
+      };
+    });
+
+    let entry = activity.find(a => a.sessionId === sessionId);
+    if (!entry) {
+      entry = { sessionId, createdAt: new Date().toISOString(), status: 'active' };
+      activity.push(entry);
+    }
+    entry.items = items;
+    entry.email = email;
+    entry.name = name;
+    entry.updatedAt = new Date().toISOString();
+    if (email && entry.status === 'active') {
+      // new activity on a cart resets the abandonment clock
+      entry.status = 'active';
+    }
+
+    await writeJSON(CART_ACTIVITY_FILE, activity);
+  } catch (err) {
+    console.error('Cart activity tracking error:', err.message);
+  }
+}
+
+async function markCartRecovered(sessionId) {
+  try {
+    const activity = await readJSON(CART_ACTIVITY_FILE);
+    const idx = activity.findIndex(a => a.sessionId === sessionId);
+    if (idx !== -1) { activity.splice(idx, 1); await writeJSON(CART_ACTIVITY_FILE, activity); }
+  } catch (err) {
+    console.error('Cart activity cleanup error:', err.message);
+  }
+}
+
+const ABANDONED_CART_HOURS = Number(process.env.ABANDONED_CART_HOURS) || 1;
+
+async function checkAbandonedCarts() {
+  if (!BREVO_API_KEY) return;
+  try {
+    const activity = await readJSON(CART_ACTIVITY_FILE);
+    const now = Date.now();
+    let changed = false;
+
+    for (const entry of activity) {
+      if (entry.status !== 'active' || !entry.email || !entry.items || !entry.items.length) continue;
+      const ageHours = (now - new Date(entry.updatedAt).getTime()) / 36e5;
+      if (ageHours < ABANDONED_CART_HOURS) continue;
+
+      const excludeIds = entry.items.map(i => i.productId);
+      const recommended = await getRecommendedProducts(excludeIds);
+      const sent = await sendMailSafe({
+        from: `"Natrio Organics" <${SENDER_EMAIL}>`,
+        to: entry.email,
+        subject: `You left something in your cart 🌿`,
+        html: emailTemplates.abandonedCartEmail(entry, recommended)
+      });
+      if (sent) {
+        entry.status = 'reminded';
+        entry.remindedAt = new Date().toISOString();
+        changed = true;
+      }
+    }
+
+    if (changed) await writeJSON(CART_ACTIVITY_FILE, activity);
+  } catch (err) {
+    console.error('Abandoned cart sweep error:', err.message);
+  }
+}
+
+const REVIEW_REQUEST_DAYS = Number(process.env.REVIEW_REQUEST_DAYS) || 3;
+
+async function checkReviewRequests() {
+  if (!BREVO_API_KEY) return;
+  try {
+    const orders = await readJSON(ORDERS_FILE);
+    const raw = await readJSON(SETTINGS_FILE);
+    const settings = (raw && !Array.isArray(raw)) ? raw : {};
+    const now = Date.now();
+    let changed = false;
+
+    for (const order of orders) {
+      if (order.status !== 'delivered' || order.reviewRequestSent || !order.customer.email) continue;
+
+      const deliveredEntry = (order.statusHistory || []).slice().reverse().find(h => h.status === 'delivered');
+      const deliveredAt = deliveredEntry ? new Date(deliveredEntry.date).getTime() : null;
+      if (!deliveredAt) continue;
+
+      const ageDays = (now - deliveredAt) / 864e5;
+      if (ageDays < REVIEW_REQUEST_DAYS) continue;
+
+      const excludeIds = order.items.map(i => i.productId);
+      const recommended = await getRecommendedProducts(excludeIds);
+      const sent = await sendMailSafe({
+        from: `"Natrio Organics" <${SENDER_EMAIL}>`,
+        to: order.customer.email,
+        subject: `How was your Natrio Organics order?`,
+        html: emailTemplates.reviewRequestEmail(order, recommended, settings.googleReviewUrl)
+      });
+      if (sent) {
+        order.reviewRequestSent = true;
+        order.reviewRequestSentAt = new Date().toISOString();
+        changed = true;
+      }
+    }
+
+    if (changed) await writeJSON(ORDERS_FILE, orders);
+  } catch (err) {
+    console.error('Review request sweep error:', err.message);
+  }
+}
+
 // ---------- password hashing (built-in crypto, no extra dependency) ----------
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -401,15 +552,39 @@ app.get('/api/instagram', async (req, res) => {
   res.json(await readJSON(INSTAGRAM_FILE));
 });
 
+app.get('/api/stores', async (req, res) => {
+  res.json(await readJSON(STORES_FILE));
+});
+
+app.get('/api/settings', async (req, res) => {
+  const raw = await readJSON(SETTINGS_FILE);
+  const settings = (raw && !Array.isArray(raw)) ? raw : {};
+  // only expose the public-facing bits — never leak anything sensitive here
+  res.json({
+    gaTrackingId: settings.gaTrackingId || '',
+    googleReviewUrl: settings.googleReviewUrl || ''
+  });
+});
+
 // ---------- Subscribers / mailing list ----------
 async function addSubscriber(email, source) {
-  if (!email || !/^\S+@\S+\.\S+$/.test(email)) return false;
+  if (!email || !/^\S+@\S+\.\S+$/.test(email)) return { success: false, isNew: false };
   const normalized = email.trim().toLowerCase();
   const subscribers = await readJSON(SUBSCRIBERS_FILE);
-  if (subscribers.find(s => s.email === normalized)) return true; // already subscribed, not an error
+  if (subscribers.find(s => s.email === normalized)) return { success: true, isNew: false }; // already subscribed, not an error
   subscribers.push({ email: normalized, source: source || 'unknown', subscribedAt: new Date().toISOString(), active: true });
   await writeJSON(SUBSCRIBERS_FILE, subscribers);
-  return true;
+  return { success: true, isNew: true };
+}
+
+async function sendWelcomeEmail(email) {
+  const recommended = await getRecommendedProducts();
+  await sendMailSafe({
+    from: `"Natrio Organics" <${SENDER_EMAIL}>`,
+    to: email,
+    subject: `Welcome to Natrio Organics 🌿`,
+    html: emailTemplates.welcomeSubscriberEmail(recommended)
+  });
 }
 
 app.get('/api/newsletter/unsubscribe', async (req, res) => {
@@ -429,7 +604,10 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
   if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
     return res.status(400).json({ error: 'Please enter a valid email address' });
   }
-  await addSubscriber(email, 'newsletter_form');
+  const result = await addSubscriber(email, 'newsletter_form');
+  if (result.isNew) {
+    sendWelcomeEmail(email.trim().toLowerCase()).catch(err => console.error('Welcome email error:', err.message));
+  }
   res.json({ success: true });
 });
 
@@ -508,6 +686,7 @@ app.post('/api/cart/add', async (req, res) => {
     cart.push({ productId, variant: variant || defaultVariantName, qty: qty || 1 });
   }
   res.json({ success: true, cartCount: cart.reduce((n, i) => n + i.qty, 0) });
+  syncCartActivity(req).catch(() => {});
 });
 
 app.post('/api/cart/update', async (req, res) => {
@@ -518,11 +697,23 @@ app.post('/api/cart/update', async (req, res) => {
     item.qty = Math.max(1, qty);
   }
   res.json({ success: true });
+  syncCartActivity(req).catch(() => {});
 });
 
 app.post('/api/cart/remove', async (req, res) => {
   const { productId, variant } = req.body;
   req.session.cart = getCart(req).filter(i => !(i.productId === productId && i.variant === variant));
+  res.json({ success: true });
+  syncCartActivity(req).catch(() => {});
+});
+
+app.post('/api/cart/set-email', async (req, res) => {
+  const { email, name } = req.body;
+  if (email && /^\S+@\S+\.\S+$/.test(email)) {
+    req.session.cartEmail = email.trim().toLowerCase();
+    if (name) req.session.cartName = name;
+    syncCartActivity(req).catch(() => {});
+  }
   res.json({ success: true });
 });
 
@@ -614,9 +805,17 @@ app.post('/api/checkout', async (req, res) => {
 
   // clear cart
   req.session.cart = [];
+  req.session.cartEmail = null;
+  req.session.cartName = null;
+  markCartRecovered(req.sessionID).catch(() => {});
 
   // opt-in to the mailing list, if requested
-  if (subscribeNewsletter) await addSubscriber(email, 'checkout');
+  if (subscribeNewsletter) {
+    const subResult = await addSubscriber(email, 'checkout');
+    if (subResult.isNew) {
+      sendWelcomeEmail(email.trim().toLowerCase()).catch(err => console.error('Welcome email error:', err.message));
+    }
+  }
 
   // send confirmation emails in the background — don't make the customer wait on this
   sendOrderConfirmationEmails(order).catch(err => console.error('Order email error:', err.message));
@@ -716,6 +915,53 @@ app.post('/api/admin/login', async (req, res) => {
 
 app.get('/api/admin/orders', requireAdmin, async (req, res) => {
   res.json(await readJSON(ORDERS_FILE));
+});
+
+app.get('/api/admin/dashboard', requireAdmin, async (req, res) => {
+  const [orders, products] = await Promise.all([readJSON(ORDERS_FILE), readJSON(PRODUCTS_FILE)]);
+
+  const now = Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+  const startOfToday = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
+
+  // revenue/order counts exclude cancelled orders — those were never real sales
+  const validOrders = orders.filter(o => o.status !== 'cancelled');
+
+  function statsSince(sinceTimestamp) {
+    const inRange = validOrders.filter(o => new Date(o.date).getTime() >= sinceTimestamp);
+    return {
+      revenue: inRange.reduce((sum, o) => sum + (o.total || 0), 0),
+      orders: inRange.length
+    };
+  }
+
+  const today = statsSince(startOfToday);
+  const last7 = statsSince(now - 7 * DAY);
+  const last30 = statsSince(now - 30 * DAY);
+  const allTime = statsSince(0);
+
+  const pendingOrdersCount = orders.filter(o => o.status === 'pending').length;
+  const lowStockCount = products.filter(p => p.stock > 0 && p.stock <= 15).length;
+  const outOfStockCount = products.filter(p => p.stock === 0).length;
+
+  // top products by units sold, over the last 30 days
+  const salesByProduct = {};
+  validOrders
+    .filter(o => new Date(o.date).getTime() >= now - 30 * DAY)
+    .forEach(o => {
+      (o.items || []).forEach(item => {
+        if (!salesByProduct[item.productId]) salesByProduct[item.productId] = { title: item.title, qty: 0, revenue: 0 };
+        salesByProduct[item.productId].qty += item.qty;
+        salesByProduct[item.productId].revenue += item.price * item.qty;
+      });
+    });
+  const topProducts = Object.values(salesByProduct).sort((a, b) => b.qty - a.qty).slice(0, 5);
+
+  res.json({
+    today, last7, last30, allTime,
+    pendingOrdersCount, lowStockCount, outOfStockCount,
+    topProducts
+  });
 });
 
 app.get('/api/admin/messages', requireAdmin, async (req, res) => {
@@ -1018,6 +1264,66 @@ app.put('/api/admin/instagram', requireAdmin, async (req, res) => {
   res.json({ success: true, posts });
 });
 
+app.get('/api/admin/stores', requireAdmin, async (req, res) => {
+  res.json(await readJSON(STORES_FILE));
+});
+
+app.put('/api/admin/stores', requireAdmin, async (req, res) => {
+  const stores = req.body.stores;
+  if (!Array.isArray(stores)) return res.status(400).json({ error: 'stores must be an array' });
+  for (const s of stores) {
+    if (!s.name) return res.status(400).json({ error: 'Each store needs a name' });
+  }
+  await writeJSON(STORES_FILE, stores);
+  res.json({ success: true, stores });
+});
+
+app.get('/api/admin/settings', requireAdmin, async (req, res) => {
+  const raw = await readJSON(SETTINGS_FILE);
+  res.json((raw && !Array.isArray(raw)) ? raw : {});
+});
+
+app.put('/api/admin/settings', requireAdmin, async (req, res) => {
+  const { gaTrackingId, googleReviewUrl } = req.body;
+  const settings = { gaTrackingId: gaTrackingId || '', googleReviewUrl: googleReviewUrl || '' };
+  await writeJSON(SETTINGS_FILE, settings);
+  res.json({ success: true, settings });
+});
+
+app.get('/api/admin/abandoned-carts', requireAdmin, async (req, res) => {
+  const activity = await readJSON(CART_ACTIVITY_FILE);
+  res.json(activity.slice().reverse());
+});
+
+app.post('/api/admin/abandoned-carts/:sessionId/remind', requireAdmin, async (req, res) => {
+  const activity = await readJSON(CART_ACTIVITY_FILE);
+  const entry = activity.find(a => a.sessionId === req.params.sessionId);
+  if (!entry) return res.status(404).json({ error: 'Cart not found' });
+  if (!entry.email) return res.status(400).json({ error: 'This cart has no email on file to send to' });
+
+  const excludeIds = (entry.items || []).map(i => i.productId);
+  const recommended = await getRecommendedProducts(excludeIds);
+  const sent = await sendMailSafe({
+    from: `"Natrio Organics" <${SENDER_EMAIL}>`,
+    to: entry.email,
+    subject: `You left something in your cart 🌿`,
+    html: emailTemplates.abandonedCartEmail(entry, recommended)
+  });
+  if (!sent) return res.status(500).json({ error: 'Failed to send reminder after retrying.' });
+
+  entry.status = 'reminded';
+  entry.remindedAt = new Date().toISOString();
+  await writeJSON(CART_ACTIVITY_FILE, activity);
+  res.json({ success: true });
+});
+
+app.delete('/api/admin/abandoned-carts/:sessionId', requireAdmin, async (req, res) => {
+  let activity = await readJSON(CART_ACTIVITY_FILE);
+  activity = activity.filter(a => a.sessionId !== req.params.sessionId);
+  await writeJSON(CART_ACTIVITY_FILE, activity);
+  res.json({ success: true });
+});
+
 app.get('/api/admin/hero', requireAdmin, async (req, res) => {
   res.json(await readJSON(HERO_FILE));
 });
@@ -1121,6 +1427,12 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`Natrio Organics store running at http://localhost:${PORT}`);
   });
+
+  // check for abandoned carts every 15 minutes
+  setInterval(() => checkAbandonedCarts().catch(err => console.error('Abandoned cart sweep failed:', err.message)), 15 * 60 * 1000);
+
+  // check for delivered orders ready for a review request every hour
+  setInterval(() => checkReviewRequests().catch(err => console.error('Review request sweep failed:', err.message)), 60 * 60 * 1000);
 }
 
 start();

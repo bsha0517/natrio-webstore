@@ -91,6 +91,7 @@ function renderFooter() {
           <h4>Information</h4>
           <ul>
             <li><a href="/about-us.html">About Us</a></li>
+            <li><a href="/find-us-in-store.html">Find Us In Store</a></li>
             <li><a href="/blog.html">Blog</a></li>
             <li><a href="/contact-us.html">Contact Us</a></li>
             <li><a href="/shipping-policy.html">Shipping &amp; Returns</a></li>
@@ -186,9 +187,31 @@ function renderWhatsAppButton() {
   `);
 }
 
+// Loads Google Analytics only if you've set a Measurement ID in
+// /admin.html → Settings. Nothing renders or slows the site down if it's
+// left blank.
+function loadAnalytics() {
+  fetch('/api/settings').then(r => r.json()).then(settings => {
+    if (!settings.gaTrackingId) return;
+    const id = settings.gaTrackingId;
+
+    const gtagScript = document.createElement('script');
+    gtagScript.async = true;
+    gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${id}`;
+    document.head.appendChild(gtagScript);
+
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { window.dataLayer.push(arguments); }
+    window.gtag = gtag;
+    gtag('js', new Date());
+    gtag('config', id);
+  }).catch(() => {});
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   renderHeader();
   renderFooter();
   renderWhatsAppButton();
   refreshCartCount();
+  loadAnalytics();
 });
