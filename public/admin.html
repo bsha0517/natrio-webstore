@@ -116,6 +116,7 @@
       <div class="tab" data-tab="discounts">Discounts</div>
       <div class="tab" data-tab="instagram">Instagram</div>
       <div class="tab" data-tab="stores">Store Locations</div>
+      <div class="tab" data-tab="announcements">Announcement Bar</div>
       <div class="tab" data-tab="abandoned">Abandoned Carts</div>
       <div class="tab" data-tab="settings">Settings</div>
       <div class="tab" data-tab="hero">Hero Slider</div>
@@ -362,6 +363,14 @@
       <p id="storeSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
     </div>
 
+    <div id="announcementsTab" class="hidden">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">The scrolling bar shown at the very top of every page. Add just one message to show it permanently, or add several and they'll automatically rotate every few seconds like a mini slider.</p>
+      <div id="announcementEditors"></div>
+      <button class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);margin-top:6px;" onclick="addAnnouncementRow()">+ Add Message</button>
+      <button class="btn btn-primary" style="margin-top:6px;margin-left:10px;" onclick="saveAnnouncements()">Save Announcement Bar</button>
+      <p id="announcementSaveMsg" style="font-size:13px;color:var(--olive);margin-top:10px;"></p>
+    </div>
+
     <div id="abandonedTab" class="hidden">
       <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Carts that have sat inactive for a while with an email attached get one automatic reminder email (checked every 15 minutes, currently after 1 hour of inactivity — configurable via the <code>ABANDONED_CART_HOURS</code> environment variable). You can also send a reminder manually anytime below.</p>
       <table>
@@ -574,6 +583,7 @@
         loadDiscounts();
         loadInstagramPosts();
         loadStores();
+        loadAnnouncements();
         loadAbandonedCarts();
         loadSettings();
         loadMessages();
@@ -615,6 +625,7 @@
         document.getElementById('discountsTab').classList.toggle('hidden', tab.dataset.tab !== 'discounts');
         document.getElementById('instagramTab').classList.toggle('hidden', tab.dataset.tab !== 'instagram');
         document.getElementById('storesTab').classList.toggle('hidden', tab.dataset.tab !== 'stores');
+        document.getElementById('announcementsTab').classList.toggle('hidden', tab.dataset.tab !== 'announcements');
         document.getElementById('abandonedTab').classList.toggle('hidden', tab.dataset.tab !== 'abandoned');
         document.getElementById('settingsTab').classList.toggle('hidden', tab.dataset.tab !== 'settings');
         document.getElementById('heroTab').classList.toggle('hidden', tab.dataset.tab !== 'hero');
@@ -1334,6 +1345,56 @@
         msg.textContent = 'Saved! Visible now on the Find Us In Store page.';
         stores = data.stores;
         renderStoreEditors();
+      }
+    }
+
+    // ---------- Announcement bar ----------
+    let announcements = [];
+
+    async function loadAnnouncements() {
+      const res = await fetch('/api/admin/announcements');
+      announcements = await res.json();
+      renderAnnouncementEditors();
+    }
+
+    function renderAnnouncementEditors() {
+      document.getElementById('announcementEditors').innerHTML = announcements.map((a, i) => `
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
+          <input value="${a.replace(/"/g, '&quot;')}" oninput="updateAnnouncementField(${i}, this.value)" placeholder="e.g. Free Shipping for All Orders from Rs. 2500" style="flex:1;">
+          <span style="color:#a33;cursor:pointer;font-size:13px;flex-shrink:0;" onclick="removeAnnouncementRow(${i})">Remove</span>
+        </div>
+      `).join('') || '<p style="color:var(--muted);font-size:13px;">No messages yet — add one below.</p>';
+    }
+
+    function updateAnnouncementField(i, value) {
+      announcements[i] = value;
+    }
+
+    function addAnnouncementRow() {
+      announcements.push('');
+      renderAnnouncementEditors();
+    }
+
+    function removeAnnouncementRow(i) {
+      announcements.splice(i, 1);
+      renderAnnouncementEditors();
+    }
+
+    async function saveAnnouncements() {
+      const res = await fetch('/api/admin/announcements', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ announcements })
+      });
+      const data = await res.json();
+      const msg = document.getElementById('announcementSaveMsg');
+      if (data.error) {
+        msg.style.color = '#a33';
+        msg.textContent = data.error;
+      } else {
+        msg.style.color = 'var(--olive)';
+        msg.textContent = 'Saved! Refresh any page to see it live.';
+        announcements = data.announcements;
+        renderAnnouncementEditors();
       }
     }
 

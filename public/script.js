@@ -1,7 +1,7 @@
 // ---------- Header & Footer (shared across pages) ----------
 function renderHeader() {
   document.body.insertAdjacentHTML('afterbegin', `
-    <div class="announce">Free Shipping for All Orders from Rs. 2500 &nbsp;|&nbsp; Use Code FIRST for 10% Off</div>
+    <div class="announce" id="announceBar">Loading…</div>
     <header class="site-header">
       <div class="header-inner">
         <button class="nav-toggle" id="navToggle" aria-label="Menu">
@@ -41,6 +41,35 @@ function renderHeader() {
   });
 
   refreshAccountLink();
+  loadAnnouncementBar();
+}
+
+async function loadAnnouncementBar() {
+  try {
+    const res = await fetch('/api/announcements');
+    const messages = await res.json();
+    const bar = document.getElementById('announceBar');
+    if (!bar) return;
+
+    if (!messages.length) {
+      bar.closest('.announce') ? bar.remove() : (bar.style.display = 'none');
+      return;
+    }
+
+    let i = 0;
+    bar.textContent = messages[0];
+
+    if (messages.length > 1) {
+      setInterval(() => {
+        i = (i + 1) % messages.length;
+        bar.style.opacity = '0';
+        setTimeout(() => {
+          bar.textContent = messages[i];
+          bar.style.opacity = '1';
+        }, 300);
+      }, 4000);
+    }
+  } catch (e) { /* noop */ }
 }
 
 async function refreshAccountLink() {

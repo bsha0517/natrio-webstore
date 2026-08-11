@@ -27,6 +27,7 @@ const DISCOUNTS_FILE = 'discounts';
 const INSTAGRAM_FILE = 'instagram';
 const SUBSCRIBERS_FILE = 'subscribers';
 const STORES_FILE = 'stores';
+const ANNOUNCEMENTS_FILE = 'announcements';
 const CART_ACTIVITY_FILE = 'cartActivity';
 const SETTINGS_FILE = 'settings';
 const MESSAGES_FILE = 'messages';
@@ -554,6 +555,10 @@ app.get('/api/instagram', async (req, res) => {
 
 app.get('/api/stores', async (req, res) => {
   res.json(await readJSON(STORES_FILE));
+});
+
+app.get('/api/announcements', async (req, res) => {
+  res.json(await readJSON(ANNOUNCEMENTS_FILE));
 });
 
 app.get('/api/settings', async (req, res) => {
@@ -1322,6 +1327,19 @@ app.put('/api/admin/stores', requireAdmin, async (req, res) => {
   }
   await writeJSON(STORES_FILE, stores);
   res.json({ success: true, stores });
+});
+
+app.get('/api/admin/announcements', requireAdmin, async (req, res) => {
+  res.json(await readJSON(ANNOUNCEMENTS_FILE));
+});
+
+app.put('/api/admin/announcements', requireAdmin, async (req, res) => {
+  const announcements = req.body.announcements;
+  if (!Array.isArray(announcements)) return res.status(400).json({ error: 'announcements must be an array' });
+  const cleaned = announcements.map(a => String(a).trim()).filter(Boolean);
+  if (!cleaned.length) return res.status(400).json({ error: 'Add at least one announcement message' });
+  await writeJSON(ANNOUNCEMENTS_FILE, cleaned);
+  res.json({ success: true, announcements: cleaned });
 });
 
 app.get('/api/admin/settings', requireAdmin, async (req, res) => {

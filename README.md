@@ -619,3 +619,12 @@ substitute for:**
   already have the infrastructure built (the Blog admin tab, and the
   post-purchase review request email), but the actual payoff comes from
   consistently using them over time.
+
+## 23. Announcement bar
+
+`/admin.html` → **Announcement Bar** tab controls the scrolling message at
+the very top of every page (currently "Free Shipping for All Orders from
+Rs. 2500 | Use Code FIRST for 10% Off"). Add a single message to show it
+permanently, or add several and they rotate automatically every 4 seconds
+with a smooth fade — a mini slider, no extra setup needed. Takes effect
+on refresh, no redeploy required.
