@@ -188,8 +188,10 @@ nav.main-nav a:hover { color: var(--olive-dark); }
   padding: 6px 24px 20px;
   max-width: var(--max);
   margin: 0 auto;
-  scrollbar-width: thin;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* old Edge/IE */
 }
+.slider-row::-webkit-scrollbar { display: none; } /* Chrome, Safari, new Edge */
 .slider-row .product-card { width: 240px; min-width: 240px; max-width: 240px; scroll-snap-align: start; flex: 0 0 auto; }
 
 /* Bestsellers: fixed 5-per-row grid on desktop (wraps to new rows if more
@@ -244,7 +246,10 @@ nav.main-nav a:hover { color: var(--olive-dark); }
   padding: 0 4px;
   max-width: var(--max);
   margin: 0 auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.insta-strip::-webkit-scrollbar { display: none; }
 .insta-strip .insta-item {
   flex: 0 0 220px;
   aspect-ratio: 3/4;

@@ -11,14 +11,21 @@
   <link rel="stylesheet" href="/style.css">
   <style>
     body { background: var(--cream); }
-    .admin-wrap { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+    .admin-wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; }
     .login-box { max-width: 340px; margin: 100px auto; background:white; padding:30px; border:1px solid var(--line); }
     table { width:100%; border-collapse: collapse; margin-top: 16px; }
     th, td { text-align:left; padding: 10px 12px; border-bottom:1px solid var(--line); font-size:14px; }
     th { font-family:'Jost'; color:var(--muted); font-weight:500; }
-    .tabs { display:flex; gap:20px; margin-bottom: 20px; border-bottom:1px solid var(--line); }
-    .tab { padding:10px 4px; cursor:pointer; color:var(--muted); }
-    .tab.active { color:var(--olive-dark); border-bottom:2px solid var(--olive); font-weight:600; }
+    .admin-body { display: flex; gap: 36px; align-items: flex-start; }
+    .tabs {
+      display: flex; flex-direction: column; gap: 2px;
+      flex: 0 0 190px; border-bottom: none; border-right: 1px solid var(--line);
+      padding-right: 20px; position: sticky; top: 24px;
+    }
+    .tab { padding: 10px 12px; cursor: pointer; color: var(--muted); border-radius: 3px; }
+    .tab:hover { background: var(--cream-deep); }
+    .tab.active { color: var(--white); background: var(--olive); font-weight: 600; }
+    .admin-content { flex: 1; min-width: 0; }
     .hidden { display:none; }
     .status-pending { color: var(--gold); }
     .status-shipped { color: var(--olive); }
@@ -46,13 +53,19 @@
 
       h1 { font-size: 24px; }
 
-      /* tabs scroll sideways instead of wrapping/overflowing the page */
+      /* on mobile, drop the sidebar layout — tabs scroll sideways above the content instead */
+      .admin-body { flex-direction: column; gap: 0; }
       .tabs {
+        flex-direction: row;
         overflow-x: auto;
         flex-wrap: nowrap;
-        gap: 16px;
-        padding-bottom: 2px;
-        -webkit-overflow-scrolling: touch;
+        gap: 8px;
+        padding: 0 0 12px;
+        margin-bottom: 16px;
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+        position: static;
+        width: 100%;
       }
       .tab { white-space: nowrap; flex-shrink: 0; font-size: 14px; }
 
@@ -93,6 +106,7 @@
       <span id="seedImportMsg" style="margin-left:10px;"></span>
     </div>
 
+    <div class="admin-body">
     <div class="tabs">
       <div class="tab active" data-tab="dashboard">Dashboard</div>
       <div class="tab" data-tab="orders">Orders</div>
@@ -110,6 +124,7 @@
       <div class="tab" data-tab="marketing">Marketing</div>
     </div>
 
+    <div class="admin-content">
     <div id="dashboardTab">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:28px;">
         <div style="background:white;border:1px solid var(--line);padding:16px 18px;">
@@ -458,6 +473,8 @@
         <tbody id="blogBody_list"></tbody>
       </table>
     </div>
+    </div>
+    </div>
   </div>
 
   <div class="modal-overlay hidden" id="orderModal" onclick="if(event.target===this) closeOrderModal()">
@@ -611,9 +628,42 @@
             <select onchange="updateOrderStatus('${o.id}', this.value)">
               ${statuses.map(s => `<option value="${s}" ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}
             </select>
+            ${o.customer.phone ? `<span title="Send WhatsApp update" style="cursor:pointer;margin-left:8px;font-size:16px;" onclick="sendWhatsAppUpdate('${o.id}')">💬</span>` : ''}
           </td>
         </tr>
       `).join('') || '<tr><td colspan="7">No orders yet.</td></tr>';
+    }
+
+    // Builds a wa.me link with a pre-filled message tailored to the
+    // order's current status — you review it and hit send yourself,
+    // nothing goes out automatically.
+    function normalizePakPhone(phone) {
+      const digits = (phone || '').replace(/\D/g, '');
+      if (digits.startsWith('92')) return digits;
+      if (digits.startsWith('0')) return '92' + digits.slice(1);
+      return digits;
+    }
+
+    function whatsAppMessageForOrder(o) {
+      const firstName = (o.customer.name || '').split(' ')[0];
+      const itemsList = o.items.map(i => `- ${i.title} (${i.variant}) x${i.qty}`).join('\n');
+
+      const messages = {
+        pending: `Hi ${firstName}! Thanks for your order #${o.id} from Natrio Organics 🌿\n\n${itemsList}\n\nTotal: ${money(o.total)}\n\nWe're getting it ready and will update you soon!`,
+        processing: `Hi ${firstName}, your Natrio Organics order #${o.id} is being processed and will be dispatched shortly!`,
+        shipped: `Hi ${firstName}, good news — your order #${o.id} has shipped! 📦\n\nExpected delivery: 1-3 business days.${o.trackingUrl ? `\n\nTrack it here: ${o.trackingUrl}` : ''}`,
+        delivered: `Hi ${firstName}, your order #${o.id} has been delivered — we hope you love it! 🌿 If anything's not right, just reply here and we'll sort it out.`,
+        cancelled: `Hi ${firstName}, your order #${o.id} has been cancelled as requested. If you paid online, your refund will be processed within a few business days. Let us know if you have any questions.`
+      };
+      return messages[o.status] || `Hi ${firstName}, this is an update about your Natrio Organics order #${o.id}.`;
+    }
+
+    function sendWhatsAppUpdate(orderId) {
+      const o = allOrders.find(x => x.id === orderId);
+      if (!o) return;
+      const phone = normalizePakPhone(o.customer.phone);
+      const message = whatsAppMessageForOrder(o);
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
     }
 
     function openOrderDetails(id) {
@@ -634,11 +684,12 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
           <div>
             <h4 style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;">Customer</h4>
-            <p style="margin:0;font-size:14px;line-height:1.7;">
+            <p style="margin:0 0 10px;font-size:14px;line-height:1.7;">
               ${o.customer.name}<br>
               ${o.customer.phone}<br>
               ${o.customer.email || '—'}
             </p>
+            ${o.customer.phone ? `<button class="btn btn-outline" style="color:var(--olive-dark);border-color:var(--line);padding:8px 14px;font-size:13px;" onclick="sendWhatsAppUpdate('${o.id}')">💬 Send WhatsApp Update</button>` : ''}
           </div>
           <div>
             <h4 style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;">Delivery Address</h4>

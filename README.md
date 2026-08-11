@@ -529,3 +529,20 @@ variable (default: `3`).
 
 Both are stored in the database and take effect immediately — no redeploy
 needed to turn analytics on/off or update your review link.
+
+## 21. WhatsApp order updates (manual, no third-party service)
+
+Every order — in both the Orders table and the order detail modal — has a
+**💬 Send WhatsApp Update** button. Clicking it opens WhatsApp (web or app,
+whichever you use) with a message already written for you, tailored to
+that order's current status (placed / processing / shipped with tracking
+link if you added one / delivered / cancelled), addressed to the
+customer's actual phone number. You review it and hit send yourself —
+nothing goes out automatically.
+
+This intentionally avoids WhatsApp's official Business Platform API,
+which needs a Meta Business Manager account, a dedicated phone number,
+template message approval, and ongoing per-message costs — overkill for
+where the store is right now. If order volume grows enough that manually
+clicking send becomes a bottleneck, that's the point to revisit full
+automation via the Cloud API or a provider like Wati/Interakt/Gupshup.
