@@ -80,10 +80,6 @@
       .modal-overlay { padding: 16px; }
       .modal-box { padding: 20px; }
       .modal-box h2 { font-size: 20px; }
-
-      /* seed import banner */
-      #seedImportBox button { display: block; margin: 10px 0 0 !important; }
-      #seedImportBox span { display: block; margin-top: 8px; }
     }
   </style>
 </head>
@@ -99,12 +95,6 @@
 
   <div class="admin-wrap hidden" id="adminWrap">
     <h1>Natrio Organics — Admin</h1>
-
-    <div id="seedImportBox" style="background:#FFF8E8;border:1px solid var(--gold);padding:14px 18px;margin-bottom:24px;font-size:13px;">
-      <strong>One-time setup:</strong> if your Products/Categories/Shipping tabs look empty after switching to MongoDB, click this once to import the original starter data that was bundled with the code.
-      <button class="btn btn-primary" style="margin-left:10px;padding:8px 16px;font-size:13px;" onclick="importSeedData()">Import Seed Data</button>
-      <span id="seedImportMsg" style="margin-left:10px;"></span>
-    </div>
 
     <div class="admin-body">
     <div class="tabs">
@@ -592,25 +582,6 @@
       } else {
         document.getElementById('loginErr').textContent = 'Incorrect password.';
       }
-    }
-
-    async function importSeedData() {
-      const msg = document.getElementById('seedImportMsg');
-      msg.style.color = 'var(--muted)';
-      msg.textContent = 'Importing…';
-      const res = await fetch('/api/admin/import-seed-data', { method: 'POST' });
-      const data = await res.json();
-      if (data.error) {
-        msg.style.color = '#a33';
-        msg.textContent = data.error;
-        return;
-      }
-      msg.style.color = 'var(--olive)';
-      msg.textContent = 'Done! ' + data.results.map(r => `${r.key}: ${r.status}${r.count !== undefined ? ' (' + r.count + ')' : ''}`).join(', ');
-      // refresh everything so the tabs show the newly imported data
-      loadOrders(); loadProducts(); loadHeroSlides(); loadCategories();
-      loadShippingMethods(); loadDiscounts(); loadInstagramPosts();
-      loadMessages(); loadSubscribers(); loadBlogPosts();
     }
 
     document.querySelectorAll('.tab').forEach(tab => {

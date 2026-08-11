@@ -922,31 +922,6 @@ app.get('/uploads/:id', async (req, res) => {
   res.send(doc.data.buffer ? Buffer.from(doc.data.buffer) : doc.data);
 });
 
-// ---------- One-time seed data import ----------
-// Copies the original data/*.json files (bundled with the deployed code)
-// into MongoDB. Safe to run more than once — it just overwrites each
-// collection with whatever's currently in the matching JSON file, so only
-// use this before you've started making real edits through the live site.
-app.post('/api/admin/import-seed-data', requireAdmin, async (req, res) => {
-  const keys = ['products', 'orders', 'categories', 'blog', 'hero', 'users', 'shipping', 'discounts', 'instagram', 'subscribers', 'messages'];
-  const results = [];
-  for (const key of keys) {
-    const filePath = path.join(__dirname, 'data', `${key}.json`);
-    if (!fs.existsSync(filePath)) {
-      results.push({ key, status: 'skipped (no file)' });
-      continue;
-    }
-    try {
-      const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-      await writeJSON(key, data);
-      results.push({ key, status: 'imported', count: Array.isArray(data) ? data.length : 1 });
-    } catch (err) {
-      results.push({ key, status: 'error: ' + err.message });
-    }
-  }
-  res.json({ success: true, results });
-});
-
 app.post('/api/admin/login', async (req, res) => {
   if (req.body.password === ADMIN_PASSWORD) {
     req.session.isAdmin = true;
