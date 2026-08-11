@@ -375,22 +375,40 @@ this limitation.
 - [ ] Set up HTTPS (Railway/Render provide this automatically; a VPS needs Let's Encrypt/Certbot)
 - [ ] Back up `data/orders.json`, `data/products.json`, and `data/users.json` regularly — `users.json` holds hashed customer passwords, so treat it as sensitive
 
-## 11. Payments — going beyond Cash on Delivery
+## 11. Payments
 
-Cash on Delivery works immediately with no setup. For card / JazzCash /
-Easypaisa, you need a merchant account with that provider, then wire their
-SDK into `server.js` at the `/api/checkout` route:
+Checkout currently offers three payment methods:
 
-- **Stripe** (international cards): sign up at stripe.com, get API keys,
-  use `stripe.paymentIntents.create()` before marking the order as paid.
-- **JazzCash / Easypaisa**: apply for a merchant account directly with them
-  (or via a payment aggregator like PayFast, SafePay, or PayMob — these
-  bundle multiple Pakistani payment methods behind one integration, which
-  is usually easier than integrating each wallet separately).
+- **Cash on Delivery** — works immediately, no setup, no verification needed.
+- **JazzCash** and **Easypaisa** — handled as **manual wallet transfers**,
+  not a live payment gateway integration. Here's how it works:
+  1. Set your wallet numbers in `/admin.html` → **Settings** → *Wallet
+     Payments* (JazzCash number, Easypaisa number, and optionally an
+     account title so customers can confirm they're sending to the right
+     place).
+  2. At checkout, a customer who picks JazzCash or Easypaisa sees your
+     number and is required to upload a screenshot of their payment
+     before they can place the order.
+  3. The order comes into `/admin.html` → **Orders** with a ⚠️ next to the
+     payment method, meaning "not yet verified." Open the order, check the
+     uploaded screenshot against your actual wallet account, and click
+     **"Mark Payment as Verified"** — the ⚠️ becomes a ✅.
+  4. This is intentionally manual: it avoids needing a merchant account or
+     gateway approval to start accepting online payments today, at the
+     cost of you having to eyeball each screenshot before fulfilling the
+     order. Don't ship an order paid via wallet until you've actually
+     confirmed the money landed in your account — the screenshot is a
+     claim, not proof the transfer succeeded.
 
-This is genuinely the part of the project that benefits most from a
-developer's help for a few hours — payment integrations involve handling
-webhooks and verifying signatures correctly for security.
+**Upgrading to a real payment gateway later:** once you have a merchant
+account with a Pakistani payment aggregator (SafePay and PayFast are
+common choices — both bundle cards, JazzCash, and Easypaisa behind one
+integration instead of three separate ones), replace the manual wallet
+flow in `server.js`'s `/api/checkout` route with their SDK, so payment
+gets verified automatically instead of by hand. This is genuinely the
+part of the project most worth a developer's time when you get there —
+gateway integrations involve handling webhooks and verifying signatures
+correctly for security, which is easy to get subtly wrong.
 
 ## 12. Project structure
 
@@ -514,21 +532,39 @@ sent once per order.
 **To change the wait time:** set the `REVIEW_REQUEST_DAYS` environment
 variable (default: `3`).
 
-## 20. Analytics & Settings
+## 20. Analytics, Ad Pixels & Settings
 
-`/admin.html` → **Settings** tab has two fields:
+`/admin.html` → **Settings** tab has two sections:
 
+**Analytics & Reviews**
 - **Google Analytics Measurement ID** — paste your GA4 ID (looks like
   `G-XXXXXXXXXX`, found in Google Analytics → Admin → Data Streams → your
-  website) and analytics loads automatically on every page, including a
-  `purchase` event fired on the order confirmation page with the real
-  order value and items — not just page views, actual conversion tracking.
-  Leave it blank and nothing loads; no performance cost either way.
-- **Google Review Link** — powers the review request email above. Get
-  yours from Google Business Profile → Ask for reviews → Copy link.
+  website) and analytics loads automatically on every page.
+- **Google Review Link** — powers the review request email (section 19).
+  Get yours from Google Business Profile → Ask for reviews → Copy link.
 
-Both are stored in the database and take effect immediately — no redeploy
-needed to turn analytics on/off or update your review link.
+**Ad Pixels** — for retargeting and measuring ad conversions on each
+platform. All are optional; leave any blank to skip that platform with no
+performance cost:
+- **Meta Pixel ID** — from Meta Events Manager → Data Sources → your pixel
+  → Settings. Powers Facebook/Instagram retargeting and ad conversion
+  tracking.
+- **TikTok Pixel ID** — from TikTok Ads Manager → Assets → Events → your
+  pixel.
+- **Google Ads Conversion ID + Label** — from Google Ads → Goals →
+  Conversions → your conversion action → "Use Google tag." Note this is
+  **different** from the GA4 Measurement ID above — GA4 tells you
+  analytics, this tells Google Ads which of your ad spend actually led to
+  a sale, which is what Google uses to optimize campaigns. Both the
+  `AW-...` ID and the label are required together.
+
+**Every configured platform automatically fires a purchase event** on the
+order confirmation page with the real order value, currency, and items —
+genuine conversion tracking, not just page views. Each platform's tracking
+code loads independently, so it's fine to set up only some of them.
+
+All settings are stored in the database and take effect immediately — no
+redeploy needed to turn any of this on/off or change an ID.
 
 ## 21. WhatsApp order updates (manual, no third-party service)
 

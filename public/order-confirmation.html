@@ -34,7 +34,11 @@
         <a href="/" class="btn btn-dark" style="margin-top:20px;">Back to Home</a>
       `;
 
-      // report the completed sale to Google Analytics, if it's configured
+      // report the completed sale to every ad/analytics platform that's
+      // configured — each check is independent, so it's fine if only some
+      // (or none) of these are set up.
+
+      // Google Analytics (GA4)
       if (window.gtag) {
         gtag('event', 'purchase', {
           transaction_id: order.id,
@@ -48,6 +52,37 @@
             price: i.price,
             quantity: i.qty
           }))
+        });
+      }
+
+      // Google Ads conversion (separate from GA4 — needs its own AW- ID + label)
+      if (window.gtag && window.__googleAdsId && window.__googleAdsLabel) {
+        gtag('event', 'conversion', {
+          send_to: `${window.__googleAdsId}/${window.__googleAdsLabel}`,
+          value: order.total,
+          currency: 'PKR',
+          transaction_id: order.id
+        });
+      }
+
+      // Meta Pixel (Facebook / Instagram)
+      if (window.fbq) {
+        fbq('track', 'Purchase', {
+          value: order.total,
+          currency: 'PKR',
+          content_ids: order.items.map(i => i.productId),
+          contents: order.items.map(i => ({ id: i.productId, quantity: i.qty, item_price: i.price })),
+          content_type: 'product'
+        });
+      }
+
+      // TikTok Pixel
+      if (window.ttq) {
+        ttq.track('CompletePayment', {
+          value: order.total,
+          currency: 'PKR',
+          content_id: order.id,
+          contents: order.items.map(i => ({ content_id: i.productId, quantity: i.qty, price: i.price }))
         });
       }
     });

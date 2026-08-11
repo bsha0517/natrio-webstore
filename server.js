@@ -561,10 +561,19 @@ app.get('/api/stores', async (req, res) => {
 app.get('/api/settings', async (req, res) => {
   const raw = await readJSON(SETTINGS_FILE);
   const settings = (raw && !Array.isArray(raw)) ? raw : {};
-  // only expose the public-facing bits — never leak anything sensitive here
+  // only expose the public-facing bits — never leak anything sensitive here.
+  // Pixel/tracking IDs are meant to be public (they're embedded in every
+  // page's HTML anyway), unlike things like API keys.
   res.json({
     gaTrackingId: settings.gaTrackingId || '',
-    googleReviewUrl: settings.googleReviewUrl || ''
+    googleReviewUrl: settings.googleReviewUrl || '',
+    metaPixelId: settings.metaPixelId || '',
+    tiktokPixelId: settings.tiktokPixelId || '',
+    googleAdsId: settings.googleAdsId || '',
+    googleAdsConversionLabel: settings.googleAdsConversionLabel || '',
+    jazzCashNumber: settings.jazzCashNumber || '',
+    easypaisaNumber: settings.easypaisaNumber || '',
+    walletAccountTitle: settings.walletAccountTitle || ''
   });
 });
 
@@ -721,7 +730,7 @@ app.post('/api/cart/set-email', async (req, res) => {
 
 // ---------- CHECKOUT / ORDER ROUTES ----------
 app.post('/api/checkout', async (req, res) => {
-  const { name, email, phone, address, city, paymentMethod, shippingMethodId, discountCode, subscribeNewsletter, notes } = req.body;
+  const { name, email, phone, address, city, paymentMethod, shippingMethodId, discountCode, subscribeNewsletter, notes, paymentProofUrl } = req.body;
   const cart = getCart(req);
   if (!cart.length) return res.status(400).json({ error: 'Cart is empty' });
   if (!name || !email || !phone || !address || !city) {
@@ -733,6 +742,9 @@ app.post('/api/checkout', async (req, res) => {
   const cleanedPhone = String(phone).replace(/[\s-]/g, '');
   if (!/^(03\d{9}|\+923\d{9})$/.test(cleanedPhone)) {
     return res.status(400).json({ error: 'Please enter a valid Pakistani mobile number (e.g. 03xx-xxxxxxx)' });
+  }
+  if ((paymentMethod === 'jazzcash' || paymentMethod === 'easypaisa') && !paymentProofUrl) {
+    return res.status(400).json({ error: 'Please upload a screenshot of your payment before placing the order.' });
   }
 
   const products = await readJSON(PRODUCTS_FILE);
@@ -789,6 +801,8 @@ app.post('/api/checkout', async (req, res) => {
     shipping,
     total,
     paymentMethod: paymentMethod || 'cod',
+    paymentProofUrl: paymentProofUrl || null,
+    paymentVerified: (paymentMethod || 'cod') === 'cod', // COD needs no verification; wallet transfers do
     status: 'pending',
     statusHistory: [{ status: 'pending', date: new Date().toISOString() }],
     notes: notes || ''
@@ -868,6 +882,29 @@ app.post('/api/admin/upload', requireAdmin, (req, res) => {
       filename: req.file.originalname,
       data: req.file.buffer,
       uploadedAt: new Date().toISOString()
+    });
+
+    res.json({ success: true, url: `/uploads/${id}` });
+  });
+});
+
+// Public upload for payment-proof screenshots at checkout (JazzCash/Easypaisa
+// manual transfers). Same storage as the admin upload above, just without
+// requiring an admin session, since customers use this before an account
+// or order even exists yet.
+app.post('/api/checkout/upload-payment-proof', (req, res) => {
+  upload.single('proof')(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No file was uploaded' });
+
+    const id = uuidv4();
+    await db.collection('uploads').insertOne({
+      _id: id,
+      contentType: req.file.mimetype,
+      filename: req.file.originalname,
+      data: req.file.buffer,
+      uploadedAt: new Date().toISOString(),
+      isPaymentProof: true
     });
 
     res.json({ success: true, url: `/uploads/${id}` });
@@ -1085,6 +1122,15 @@ app.delete('/api/admin/blog/:id', requireAdmin, async (req, res) => {
   res.json({ success: true });
 });
 
+app.put('/api/admin/orders/:id/verify-payment', requireAdmin, async (req, res) => {
+  const orders = await readJSON(ORDERS_FILE);
+  const order = orders.find(o => o.id === req.params.id);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  order.paymentVerified = true;
+  await writeJSON(ORDERS_FILE, orders);
+  res.json({ success: true, order });
+});
+
 app.put('/api/admin/orders/:id/status', requireAdmin, async (req, res) => {
   const { status, trackingUrl } = req.body;
   const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
@@ -1286,8 +1332,18 @@ app.get('/api/admin/settings', requireAdmin, async (req, res) => {
 });
 
 app.put('/api/admin/settings', requireAdmin, async (req, res) => {
-  const { gaTrackingId, googleReviewUrl } = req.body;
-  const settings = { gaTrackingId: gaTrackingId || '', googleReviewUrl: googleReviewUrl || '' };
+  const { gaTrackingId, googleReviewUrl, metaPixelId, tiktokPixelId, googleAdsId, googleAdsConversionLabel, jazzCashNumber, easypaisaNumber, walletAccountTitle } = req.body;
+  const settings = {
+    gaTrackingId: gaTrackingId || '',
+    googleReviewUrl: googleReviewUrl || '',
+    metaPixelId: metaPixelId || '',
+    tiktokPixelId: tiktokPixelId || '',
+    googleAdsId: googleAdsId || '',
+    googleAdsConversionLabel: googleAdsConversionLabel || '',
+    jazzCashNumber: jazzCashNumber || '',
+    easypaisaNumber: easypaisaNumber || '',
+    walletAccountTitle: walletAccountTitle || ''
+  };
   await writeJSON(SETTINGS_FILE, settings);
   res.json({ success: true, settings });
 });

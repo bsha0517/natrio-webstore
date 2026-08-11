@@ -191,21 +191,67 @@ function renderWhatsAppButton() {
 // Loads Google Analytics only if you've set a Measurement ID in
 // /admin.html → Settings. Nothing renders or slows the site down if it's
 // left blank.
+// Loads Google Analytics, Google Ads conversion tracking, Meta Pixel, and
+// TikTok Pixel — but only whichever ones you've actually configured in
+// /admin.html → Settings. Nothing renders or slows the site down for any
+// platform left blank.
 function loadAnalytics() {
   fetch('/api/settings').then(r => r.json()).then(settings => {
-    if (!settings.gaTrackingId) return;
-    const id = settings.gaTrackingId;
+    // ---- Google (GA4 + Google Ads share the same gtag.js loader) ----
+    if (settings.gaTrackingId || settings.googleAdsId) {
+      const gtagId = settings.gaTrackingId || settings.googleAdsId;
+      const gtagScript = document.createElement('script');
+      gtagScript.async = true;
+      gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${gtagId}`;
+      document.head.appendChild(gtagScript);
 
-    const gtagScript = document.createElement('script');
-    gtagScript.async = true;
-    gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${id}`;
-    document.head.appendChild(gtagScript);
+      window.dataLayer = window.dataLayer || [];
+      function gtag() { window.dataLayer.push(arguments); }
+      window.gtag = gtag;
+      gtag('js', new Date());
+      if (settings.gaTrackingId) gtag('config', settings.gaTrackingId);
+      if (settings.googleAdsId) gtag('config', settings.googleAdsId);
+      window.__googleAdsId = settings.googleAdsId || '';
+      window.__googleAdsLabel = settings.googleAdsConversionLabel || '';
+    }
 
-    window.dataLayer = window.dataLayer || [];
-    function gtag() { window.dataLayer.push(arguments); }
-    window.gtag = gtag;
-    gtag('js', new Date());
-    gtag('config', id);
+    // ---- Meta Pixel (Facebook / Instagram ads) ----
+    if (settings.metaPixelId) {
+      /* eslint-disable */
+      !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+      n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+      document,'script','https://connect.facebook.net/en_US/fbevents.js');
+      /* eslint-enable */
+      window.fbq('init', settings.metaPixelId);
+      window.fbq('track', 'PageView');
+    }
+
+    // ---- TikTok Pixel ----
+    if (settings.tiktokPixelId) {
+      /* eslint-disable */
+      !function (w, d, t) {
+        w.TiktokAnalyticsObject = t; var ttq = w[t] = w[t] || [];
+        ttq.methods = ["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"];
+        ttq.setAndDefer = function (t, e) { t[e] = function () { t.push([e].concat(Array.prototype.slice.call(arguments, 0))) } };
+        for (var i = 0; i < ttq.methods.length; i++) ttq.setAndDefer(ttq, ttq.methods[i]);
+        ttq.instance = function (t) { for (var e = ttq._i[t] || [], n = 0; n < ttq.methods.length; n++) ttq.setAndDefer(e, ttq.methods[n]); return e };
+        ttq.load = function (e, n) {
+          var i = "https://analytics.tiktok.com/i18n/pixel/events.js";
+          ttq._i = ttq._i || {}; ttq._i[e] = []; ttq._i[e]._u = i;
+          ttq._t = ttq._t || {}; ttq._t[e] = +new Date;
+          ttq._o = ttq._o || {}; ttq._o[e] = n || {};
+          var s = document.createElement("script"); s.type = "text/javascript"; s.async = true;
+          s.src = i + "?sdkid=" + e + "&lib=" + t;
+          var f = document.getElementsByTagName("script")[0];
+          f.parentNode.insertBefore(s, f);
+        };
+        ttq.load(settings.tiktokPixelId);
+        ttq.page();
+      }(window, document, 'ttq');
+      /* eslint-enable */
+    }
   }).catch(() => {});
 }
 
