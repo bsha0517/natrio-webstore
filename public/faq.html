@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Frequently Asked Questions — Natrio Organics</title>
+  <meta name="description" content="Answers to common questions about Natrio Organics — shipping times, payment methods, ingredients, and returns.">
+  <link rel="canonical" href="https://natrio.pk/faq.html">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="FAQ — Natrio Organics">
+  <meta property="og:description" content="Answers to common questions about Natrio Organics — shipping, payment, ingredients, and returns.">
+  <meta property="og:url" content="https://natrio.pk/faq.html">
+  <meta property="og:image" content="https://natrio.pk/images/logo.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
+  <link rel="apple-touch-icon" href="/images/favicon-180.png">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .faq-wrap { max-width: 720px; margin: 0 auto; padding: 46px 24px 90px; }
+    .faq-wrap h1 { font-size: 30px; margin-bottom: 10px; text-align: center; }
+    .faq-wrap > p { color: var(--muted); font-size: 15px; text-align: center; max-width: 480px; margin: 0 auto 40px; line-height: 1.7; }
+    .faq-item { border-bottom: 1px solid var(--line); padding: 18px 0; }
+    .faq-question {
+      display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; font-family: 'Fraunces', serif; font-size: 16.5px; color: var(--ink);
+    }
+    .faq-question .plus { font-size: 20px; color: var(--olive); flex-shrink: 0; margin-left: 16px; transition: transform .2s ease; }
+    .faq-item.open .faq-question .plus { transform: rotate(45deg); }
+    .faq-answer { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
+    .faq-item.open .faq-answer { max-height: 400px; }
+    .faq-answer p { font-size: 14.5px; color: var(--muted); line-height: 1.7; margin: 12px 0 0; }
+    .faq-cta { text-align: center; margin-top: 50px; padding-top: 40px; border-top: 1px solid var(--line); }
+    .faq-cta p { color: var(--muted); font-size: 14px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+
+  <div class="faq-wrap">
+    <h1>Frequently Asked Questions</h1>
+    <p>Everything you need to know about ordering, shipping, and using Natrio Organics products.</p>
+
+    <div id="faqList"></div>
+
+    <div class="faq-cta">
+      <p>Still have a question?</p>
+      <a href="/contact-us.html" class="btn btn-dark">Contact Us</a>
+    </div>
+  </div>
+
+  <script src="/script.js"></script>
+  <script>
+    const faqs = [
+      {
+        q: 'Do you offer Cash on Delivery?',
+        a: 'Yes — Cash on Delivery is available nationwide across Pakistan. We also accept Credit/Debit Card, JazzCash, and Easypaisa at checkout.'
+      },
+      {
+        q: 'How long does delivery take?',
+        a: 'Orders usually arrive within 1–3 business days after dispatch. Orders placed before 2:00 PM on a business day begin processing the same day.'
+      },
+      {
+        q: 'Is shipping free?',
+        a: 'Yes, shipping is free on all orders above Rs. 2500. Below that, a flat delivery charge applies at checkout — see our Shipping Information page for exact rates.'
+      },
+      {
+        q: 'Are your oils really cold-pressed and natural?',
+        a: 'Yes. Every Natrio Organics oil is cold-pressed with no added fillers, synthetic fragrances, or diluted cooking-oil mixtures — just pure, naturally extracted oil.'
+      },
+      {
+        q: 'What is your return policy?',
+        a: 'We accept returns or exchanges within 7 days of delivery, provided the item is unused and in its original condition. If you receive a damaged item, contact us within 24 hours with photos and we\'ll arrange a replacement or refund.'
+      },
+      {
+        q: 'Can I buy Natrio Organics in stores, not just online?',
+        a: 'Yes — Natrio Organics is available in-store at select retail partners in Lahore, including Decent Store and Rainbow Hypermarket. See our Find Us In Store page for details.'
+      },
+      {
+        q: 'How do I contact customer support?',
+        a: 'You can reach us via WhatsApp, phone, or email — all listed on our Contact Us page — or use the WhatsApp button in the corner of any page on our site.'
+      },
+      {
+        q: 'Do you deliver outside Pakistan?',
+        a: 'Currently, Natrio Organics only delivers within Pakistan.'
+      }
+    ];
+
+    document.getElementById('faqList').innerHTML = faqs.map((f, i) => `
+      <div class="faq-item" id="faqItem${i}">
+        <div class="faq-question" onclick="document.getElementById('faqItem${i}').classList.toggle('open')">
+          <span>${f.q}</span>
+          <span class="plus">+</span>
+        </div>
+        <div class="faq-answer"><p>${f.a}</p></div>
+      </div>
+    `).join('');
+
+    // FAQPage structured data — helps Google show these as expandable
+    // rich results directly in search, and gives AI answer engines
+    // clean, directly-attributable Q&A content to pull from.
+    const ldScript = document.createElement('script');
+    ldScript.type = 'application/ld+json';
+    ldScript.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: faqs.map(f => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a }
+      }))
+    });
+    document.head.appendChild(ldScript);
+  </script>
+</body>
+</html>

@@ -546,3 +546,40 @@ template message approval, and ongoing per-message costs — overkill for
 where the store is right now. If order volume grows enough that manually
 clicking send becomes a bottleneck, that's the point to revisit full
 automation via the Cloud API or a provider like Wati/Interakt/Gupshup.
+
+## 22. SEO for Google and AI answer engines (ChatGPT, Perplexity, etc.)
+
+Beyond the technical SEO already covered in section 14:
+
+- **`/faq.html`** — common questions with `FAQPage` structured data, which
+  can let Google show expandable Q&A results directly in search, and gives
+  AI answer engines clean, directly-quotable content. Linked in the footer.
+- **`Store`/`LocalBusiness` structured data** on the homepage — your
+  address, phone, hours, and price range, so Google understands Natrio
+  Organics as a real, locatable business (helps with "near me" style
+  searches), not just a website.
+- **`/llms.txt`** — a plain-text summary of the business, products, and key
+  pages, written specifically for AI crawlers. This is an emerging (not yet
+  universally adopted) convention, similar in spirit to `robots.txt` but
+  aimed at language models rather than search engine crawlers.
+- **Alt text audit** — every meaningful product/blog image now has
+  descriptive alt text; purely decorative/duplicate images (like the
+  hover-swap image on product cards) intentionally have empty alt text,
+  which is the correct accessibility practice, not an oversight.
+
+**What actually moves the needle beyond this, that no amount of code can
+substitute for:**
+- **Google Business Profile** — not yet set up as far as this project
+  knows; genuinely one of the highest-leverage things you can do for local
+  search and AI-generated answers about "hair oil shops in Lahore" style
+  queries.
+- **Backlinks** — other websites (press, local directories, beauty blog
+  roundups) linking to natrio.pk. This is what actually builds domain
+  authority in Google's eyes.
+- **Being mentioned elsewhere on the web** — Reddit, review sites,
+  Instagram/TikTok — AI answer engines weight how often and how positively
+  a business is discussed across the internet, not just its own site.
+- **Regular blog content and accumulating real customer reviews** — both
+  already have the infrastructure built (the Blog admin tab, and the
+  post-purchase review request email), but the actual payoff comes from
+  consistently using them over time.

@@ -216,7 +216,7 @@
           </div>
           ${gallery.length > 1 ? `
             <div class="pd-thumbs" id="pdThumbs">
-              ${gallery.map((src, i) => `<div class="pd-thumb ${i === 0 ? 'active' : ''}" data-src="${src}"><img src="${src}" alt=""></div>`).join('')}
+              ${gallery.map((src, i) => `<div class="pd-thumb ${i === 0 ? 'active' : ''}" data-src="${src}"><img src="${src}" alt="${p.title} — view ${i + 1}"></div>`).join('')}
             </div>` : ''}
         </div>
 
@@ -369,6 +369,7 @@
       // sticky mobile add-to-cart bar
       const sticky = document.getElementById('stickyAtc');
       document.getElementById('stickyImg').src = gallery[0] || '';
+      document.getElementById('stickyImg').alt = p.title;
       document.getElementById('stickyTitle').textContent = p.title;
       document.getElementById('stickyPrice').textContent = money(variants[0].price);
       document.getElementById('stickyAddBtn').addEventListener('click', async () => {

@@ -23,10 +23,26 @@
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "Organization",
+    "@type": "Store",
     "name": "Natrio Organics",
     "url": "https://natrio.pk",
     "logo": "https://natrio.pk/images/logo.png",
+    "image": "https://natrio.pk/images/logo.png",
+    "priceRange": "Rs. 120 - Rs. 800",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Plot No. 237-C, Block Commercial, Etihad Town Phase 1, Off Raiwind Road",
+      "addressLocality": "Lahore",
+      "addressCountry": "PK"
+    },
+    "telephone": "+92-330-3065888",
+    "email": "info@natrio.pk",
+    "openingHoursSpecification": {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+      "opens": "09:00",
+      "closes": "18:00"
+    },
     "sameAs": [
       "https://www.facebook.com/share/18v6kUqF9a/",
       "https://www.instagram.com/natrioorganics"
@@ -193,7 +209,7 @@
         return;
       }
       strip.innerHTML = posts.map(p => `
-        <a class="insta-item" href="${p.postUrl}" target="_blank" style="background-image:url('${p.image}')"></a>
+        <a class="insta-item" href="${p.postUrl}" target="_blank" style="background-image:url('${p.image}')" aria-label="View Natrio Organics post on Instagram"></a>
       `).join('');
     });
 

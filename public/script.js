@@ -93,6 +93,7 @@ function renderFooter() {
             <li><a href="/about-us.html">About Us</a></li>
             <li><a href="/find-us-in-store.html">Find Us In Store</a></li>
             <li><a href="/blog.html">Blog</a></li>
+            <li><a href="/faq.html">FAQ</a></li>
             <li><a href="/contact-us.html">Contact Us</a></li>
             <li><a href="/shipping-policy.html">Shipping &amp; Returns</a></li>
             <li><a href="/privacy-policy.html">Privacy Policy</a></li>

@@ -240,6 +240,8 @@ app.get('/sitemap.xml', async (req, res) => {
     { loc: '/products.html', priority: '0.9', changefreq: 'daily' },
     { loc: '/about-us.html', priority: '0.6', changefreq: 'monthly' },
     { loc: '/contact-us.html', priority: '0.6', changefreq: 'monthly' },
+    { loc: '/faq.html', priority: '0.6', changefreq: 'monthly' },
+    { loc: '/find-us-in-store.html', priority: '0.5', changefreq: 'monthly' },
     { loc: '/blog.html', priority: '0.7', changefreq: 'weekly' },
     { loc: '/shipping-policy.html', priority: '0.3', changefreq: 'monthly' },
     { loc: '/privacy-policy.html', priority: '0.3', changefreq: 'monthly' }
