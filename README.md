@@ -185,11 +185,24 @@ This setup powers:
   came in.
 - **Shipped notification** — when you mark an order as **shipped** from
   `/admin.html` → **Orders** tab, the customer automatically gets an email
-  letting them know.
+  letting them know. You'll be prompted for an optional tracking link when
+  you set this status — paste your courier's tracking URL for that order
+  and it appears as a "Track Your Order" button in the customer's email.
+  Leave it blank if you don't have one yet.
 - **Delivered notification** — same idea, triggered when you mark an order
   as **delivered**.
+- **Cancellation notification** — sent when you mark an order **cancelled**,
+  letting the customer know and mentioning refund timing if they paid online.
 - **Marketing campaigns** — sent from the **Marketing** tab to your
   subscriber list.
+
+**All four order emails (placed, cancelled, shipped, delivered) are fully
+designed HTML emails** — your logo, brand colors, an itemized order table,
+and a "You might also like" section with 3 product cards (pulled from your
+bestsellers/featured products, pulling different ones each time) to
+encourage repeat browsing. The template lives in `email-templates.js` if
+you ever want to tweak the wording or layout — it's plain HTML/inline CSS,
+no build step required.
 
 **Reliability:** every email automatically retries up to 3 times with a
 short pause between attempts if the first try fails. If an email still

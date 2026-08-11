@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { MongoClient } = require('mongodb');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
+const emailTemplates = require('./email-templates');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -132,13 +133,28 @@ function orderItemsText(order) {
   return order.items.map(i => `  - ${i.title} (${i.variant}) x${i.qty} — Rs. ${i.price * i.qty}`).join('\n');
 }
 
+// Pulls a few products for the "You might also like" section in emails —
+// prefers bestsellers/featured items, falls back to whatever's in stock.
+async function getRecommendedProducts(excludeProductIds = []) {
+  try {
+    const products = await readJSON(PRODUCTS_FILE);
+    const inStock = products.filter(p => p.stock > 0 && !excludeProductIds.includes(p.id));
+    const preferred = inStock.filter(p => p.bestseller || p.featured);
+    const pool = preferred.length >= 3 ? preferred : inStock;
+    // shuffle lightly so emails don't always show the exact same 3 products
+    return pool.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+  } catch (err) {
+    console.error('Could not load recommended products for email:', err.message);
+    return [];
+  }
+}
+
 async function sendOrderConfirmationEmails(order) {
   if (!BREVO_API_KEY) {
     console.log('Email not configured — skipping order confirmation emails.');
     return;
   }
-  const itemsText = orderItemsText(order);
-  const summary = `Order #${order.id}\n\nItems:\n${itemsText}\n\nSubtotal: Rs. ${order.subtotal}${order.discountAmount ? `\nDiscount (${order.discountCode}): -Rs. ${order.discountAmount}` : ''}\nShipping (${order.shippingMethod}): ${order.shipping === 0 ? 'Free' : 'Rs. ' + order.shipping}\nTotal: Rs. ${order.total}\n\nPayment method: ${order.paymentMethod.toUpperCase()}\n\nDelivery to:\n${order.customer.name}\n${order.customer.address}\n${order.customer.city}\nPhone: ${order.customer.phone}`;
+  const recommended = await getRecommendedProducts(order.items.map(i => i.productId));
 
   // email to the customer, if they gave one
   if (order.customer.email) {
@@ -146,11 +162,13 @@ async function sendOrderConfirmationEmails(order) {
       from: `"Natrio Organics" <${SENDER_EMAIL}>`,
       to: order.customer.email,
       subject: `Your Natrio Organics order #${order.id} is confirmed`,
-      text: `Hi ${order.customer.name.split(' ')[0]},\n\nThanks for your order! Here's a summary:\n\n${summary}\n\nWe'll email you again once it ships.\n\n— Natrio Organics`
+      html: emailTemplates.orderPlacedEmail(order, recommended)
     });
   }
 
-  // email to the store owner
+  // email to the store owner (plain text is fine for this one — it's for you, not a customer)
+  const itemsText = orderItemsText(order);
+  const summary = `Order #${order.id}\n\nItems:\n${itemsText}\n\nSubtotal: Rs. ${order.subtotal}${order.discountAmount ? `\nDiscount (${order.discountCode}): -Rs. ${order.discountAmount}` : ''}\nShipping (${order.shippingMethod}): ${order.shipping === 0 ? 'Free' : 'Rs. ' + order.shipping}\nTotal: Rs. ${order.total}\n\nPayment method: ${order.paymentMethod.toUpperCase()}\n\nDelivery to:\n${order.customer.name}\n${order.customer.address}\n${order.customer.city}\nPhone: ${order.customer.phone}`;
   await sendMailSafe({
     from: `"Natrio Organics Website" <${SENDER_EMAIL}>`,
     to: CONTACT_EMAIL,
@@ -162,23 +180,20 @@ async function sendOrderConfirmationEmails(order) {
 async function sendOrderStatusEmail(order, status) {
   if (!order.customer.email) return;
 
-  const copy = {
-    shipped: {
-      subject: `Your Natrio Organics order #${order.id} has shipped`,
-      body: `Good news — your order #${order.id} is on its way!\n\n${orderItemsText(order)}\n\nDelivery to:\n${order.customer.address}\n${order.customer.city}\n\nExpected delivery: 1–3 business days.`
-    },
-    delivered: {
-      subject: `Your Natrio Organics order #${order.id} has been delivered`,
-      body: `Your order #${order.id} has been marked as delivered — we hope you love it!\n\n${orderItemsText(order)}\n\nIf anything's not right with your order, just reply to this email or reach us on WhatsApp and we'll sort it out.`
-    }
-  }[status];
-  if (!copy) return;
+  const templates = {
+    shipped: { subject: `Your Natrio Organics order #${order.id} has shipped`, render: emailTemplates.orderShippedEmail },
+    delivered: { subject: `Your Natrio Organics order #${order.id} has been delivered`, render: emailTemplates.orderDeliveredEmail },
+    cancelled: { subject: `Your Natrio Organics order #${order.id} has been cancelled`, render: emailTemplates.orderCancelledEmail }
+  };
+  const t = templates[status];
+  if (!t) return;
 
+  const recommended = await getRecommendedProducts(order.items.map(i => i.productId));
   await sendMailSafe({
     from: `"Natrio Organics" <${SENDER_EMAIL}>`,
     to: order.customer.email,
-    subject: copy.subject,
-    text: `Hi ${order.customer.name.split(' ')[0]},\n\n${copy.body}\n\n— Natrio Organics`
+    subject: t.subject,
+    html: t.render(order, recommended)
   });
 }
 
@@ -823,7 +838,7 @@ app.delete('/api/admin/blog/:id', requireAdmin, async (req, res) => {
 });
 
 app.put('/api/admin/orders/:id/status', requireAdmin, async (req, res) => {
-  const { status } = req.body;
+  const { status, trackingUrl } = req.body;
   const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
   if (!validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid status' });
 
@@ -835,6 +850,7 @@ app.put('/api/admin/orders/:id/status', requireAdmin, async (req, res) => {
   const wasShipped = order.status === 'shipped';
   const wasDelivered = order.status === 'delivered';
   order.status = status;
+  if (status === 'shipped' && trackingUrl) order.trackingUrl = trackingUrl;
   if (!order.statusHistory) order.statusHistory = [];
   order.statusHistory.push({ status, date: new Date().toISOString() });
   await writeJSON(ORDERS_FILE, orders);
@@ -856,12 +872,15 @@ app.put('/api/admin/orders/:id/status', requireAdmin, async (req, res) => {
     await writeJSON(PRODUCTS_FILE, products);
   }
 
-  // notify the customer when their order ships or is delivered
+  // notify the customer on the status changes that matter to them
   if (status === 'shipped' && !wasShipped) {
     sendOrderStatusEmail(order, 'shipped').catch(err => console.error('Shipped email error:', err.message));
   }
   if (status === 'delivered' && !wasDelivered) {
     sendOrderStatusEmail(order, 'delivered').catch(err => console.error('Delivered email error:', err.message));
+  }
+  if (status === 'cancelled' && !wasCancelled) {
+    sendOrderStatusEmail(order, 'cancelled').catch(err => console.error('Cancellation email error:', err.message));
   }
 
   res.json({ success: true, order });

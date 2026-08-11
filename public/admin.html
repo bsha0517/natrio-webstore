@@ -552,6 +552,7 @@
         </div>
 
         <p style="font-size:13px;color:var(--muted);"><strong>Payment method:</strong> ${o.paymentMethod.toUpperCase()}</p>
+        ${o.trackingUrl ? `<p style="font-size:13px;color:var(--muted);"><strong>Tracking link:</strong> <a href="${o.trackingUrl}" target="_blank" style="color:var(--olive);">${o.trackingUrl}</a></p>` : ''}
         ${o.notes ? `<p style="font-size:13px;color:var(--muted);"><strong>Order notes:</strong> ${o.notes}</p>` : ''}
 
         ${o.statusHistory && o.statusHistory.length ? `
@@ -569,9 +570,18 @@
     }
 
     async function updateOrderStatus(id, status) {
+      let trackingUrl = '';
+      if (status === 'shipped') {
+        const order = allOrders.find(o => o.id === id);
+        trackingUrl = prompt(
+          'Optional: paste a tracking link for the customer (shown as a "Track Your Order" button in their shipped email). Leave blank to skip.',
+          (order && order.trackingUrl) || ''
+        );
+        if (trackingUrl === null) return; // they hit Cancel — don't change the status
+      }
       await fetch(`/api/admin/orders/${id}/status`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status, trackingUrl: trackingUrl || undefined })
       });
       loadOrders();
     }
