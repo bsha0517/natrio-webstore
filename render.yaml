@@ -14,3 +14,9 @@ services:
         sync: false
       - key: NODE_VERSION
         value: 20.18.0
+      - key: BREVO_API_KEY
+        sync: false
+      - key: SENDER_EMAIL
+        sync: false
+      - key: CONTACT_EMAIL
+        sync: false

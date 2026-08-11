@@ -165,8 +165,15 @@ Go to **/admin.html**, log in with the password set in `ADMIN_PASSWORD`
 
 ## 7. Email notifications
 
-The same SMTP setup below (step-by-step further down this section) powers
-these emails:
+Emails are sent through **Brevo** (formerly Sendinblue), using their HTTP
+API — not traditional SMTP. This matters: Render blocks outbound SMTP
+ports (465/587) at the network level as an anti-spam measure, which is why
+a Gmail-SMTP setup can never actually connect from a Render-hosted app, no
+matter how correct the credentials are. Brevo's API runs over regular
+HTTPS instead, the same way every other API call in this app works, so
+it isn't affected by that restriction.
+
+This setup powers:
 
 - **Contact form** — the Contact Us page saves every message to
   `data/messages.json` (viewable in `/admin.html` → **Messages** tab) and,
@@ -184,33 +191,40 @@ these emails:
 - **Marketing campaigns** — sent from the **Marketing** tab to your
   subscriber list.
 
-**Reliability:** every one of these emails now automatically retries up to
-3 times with a short pause between attempts if the first try times out —
-this matters because outbound connections from Render to Gmail can
-occasionally be flaky (the same kind of intermittent network hiccup you
-may have seen with MongoDB during setup). A single retry usually clears it
-up. If an email still fails after all attempts, it's logged in your
-Render service logs (e.g. `Shipped email error: ...`) so you can see what
-happened — the order or message itself is always saved regardless, only
-the email notification is affected.
+**Reliability:** every email automatically retries up to 3 times with a
+short pause between attempts if the first try fails. If an email still
+fails after all attempts, it's logged in your Render service logs (e.g.
+`Shipped email error: ...`) so you can see what happened — the order or
+message itself is always saved regardless, only the email notification is
+affected.
 
 All of this is optional — if you skip the setup below, orders and messages
 are still saved normally, you'll just need to check the admin panel instead
 of your inbox.
 
-**To turn on email sending:**
-1. Use a Gmail account you're happy to send from (a dedicated one is fine).
-2. Go to your Google Account → **Security** → turn on **2-Step Verification**
-   if it isn't already on.
-3. Go to **Security** → **App passwords**, create one for "Mail", and copy
-   the 16-character password it gives you.
-4. Add two environment variables wherever you deploy (see the Render section
-   below for how):
-   - `SMTP_USER` — your Gmail address
-   - `SMTP_PASS` — the app password from step 3 (not your normal Gmail password)
-5. Optionally set `CONTACT_EMAIL` to a different address if you want contact
-   form submissions and new-order alerts sent somewhere other than
-   `info@natrio.pk`.
+**To turn on email sending (free tier: 300 emails/day):**
+1. Sign up at [brevo.com](https://www.brevo.com) (free, no credit card
+   required for the free tier).
+2. Go to **Senders, Domains & Dedicated IPs** → **Senders** → add the email
+   address you want to send *from* (e.g. `info@natrio.pk` or a Gmail
+   address you control). Brevo will email that address a verification
+   link — click it to confirm you own it. You can't send from an address
+   until it's verified this way.
+3. Go to your Brevo account menu (top right) → **SMTP & API** → **API
+   Keys** tab → **Generate a new API key**. Copy it — Brevo only shows it
+   once.
+4. Add these environment variables wherever you deploy (see the Render
+   section below for how):
+   - `BREVO_API_KEY` — the API key from step 3
+   - `SENDER_EMAIL` — the verified sender address from step 2
+   - `CONTACT_EMAIL` — where you want contact-form messages and new-order
+     alerts sent (can be the same as `SENDER_EMAIL`, or different)
+5. That's it — no port numbers, no app passwords, no SMTP configuration.
+
+**On the free plan's 300/day limit:** each order sends 2 emails (customer
++ you), so that's room for 150 orders/day before you'd need to upgrade —
+plenty for most stores starting out. Brevo's paid tiers remove the daily
+cap if you outgrow it later.
 
 ## 8. Deploying to Render.com (recommended)
 
@@ -226,8 +240,8 @@ serverless function — so this project works there with **no code changes**.
    and pre-fill the build command (`npm install`) and start command (`npm start`).
 4. When prompted, set the `ADMIN_PASSWORD` environment variable to something
    only you know (this protects `/admin.html`). `SESSION_SECRET` is generated
-   for you automatically. If you've set up Gmail sending (see step 7), also
-   add `SMTP_USER`, `SMTP_PASS`, and optionally `CONTACT_EMAIL` here.
+   for you automatically. If you've set up Brevo (see step 7), also add
+   `BREVO_API_KEY`, `SENDER_EMAIL`, and `CONTACT_EMAIL` here.
 5. Click **Deploy**. After a couple of minutes you'll get a live URL like
    `natrio-store.onrender.com`.
 6. **Connecting all three domains** (`natrio.pk`, `natrio.com.pk`,

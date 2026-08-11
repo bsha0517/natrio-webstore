@@ -3,7 +3,6 @@ const session = require('express-session');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
 const { MongoClient } = require('mongodb');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
@@ -48,51 +47,66 @@ async function writeJSON(key, data) {
   );
 }
 
-// ---------- Email (optional — only sends if SMTP_USER / SMTP_PASS are set) ----------
+// ---------- Email via Brevo's HTTP API (not raw SMTP) ----------
+// Render blocks outbound SMTP ports (465/587) at the network level, which
+// is why the earlier Gmail SMTP setup could never actually connect —
+// every attempt failed with a connection timeout before it even got to
+// authentication. Brevo's API runs over plain HTTPS, same as any other
+// API call this app already makes, so it isn't affected by that.
+const BREVO_API_KEY = process.env.BREVO_API_KEY || null;
+const SENDER_EMAIL = process.env.SENDER_EMAIL || process.env.CONTACT_EMAIL || 'info@natrio.pk';
+const SENDER_NAME = process.env.SENDER_NAME || 'Natrio Organics';
 const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'info@natrio.pk';
-let mailTransporter = null;
-if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-  mailTransporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    // Render's network to Gmail can be flaky (same kind of intermittent
-    // timeout we saw with MongoDB's DNS earlier) — these keep a single
-    // attempt from hanging forever, so the retry logic below can kick in
-    // quickly instead of the whole request stalling.
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 15000,
-    pool: true,
-    maxConnections: 3
-  });
-}
 
-// Every transactional email (order confirmations, shipped/delivered
-// notices, contact form) goes through this, so a single transient network
-// hiccup — which is common on Render's outbound connections — doesn't
-// silently drop the email. Retries twice with a short pause before giving up.
+// Accepts the same shape the rest of this file already uses:
+// { from: '"Name" <email>' (optional), to, subject, text, html, replyTo }
 async function sendMailSafe(mailOptions, attempts = 3) {
-  if (!mailTransporter) {
-    console.log('Email not configured (SMTP_USER/SMTP_PASS missing) — skipping send.');
+  if (!BREVO_API_KEY) {
+    console.log('Email not configured (BREVO_API_KEY missing) — skipping send.');
     return false;
   }
+
+  const fromMatch = /^"?([^"<]*)"?\s*<?([^<>]+@[^<>]+)>?$/.exec(mailOptions.from || '');
+  const senderName = (fromMatch && fromMatch[1].trim()) || SENDER_NAME;
+
+  const payload = {
+    sender: { name: senderName, email: SENDER_EMAIL },
+    to: [{ email: mailOptions.to }],
+    subject: mailOptions.subject,
+    htmlContent: mailOptions.html || `<pre style="font-family:inherit;white-space:pre-wrap;">${(mailOptions.text || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</pre>`
+  };
+  if (mailOptions.text && !mailOptions.html) payload.textContent = mailOptions.text;
+  if (mailOptions.replyTo) payload.replyTo = { email: mailOptions.replyTo };
+
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      await mailTransporter.sendMail(mailOptions);
-      return true;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': BREVO_API_KEY,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      if (res.ok) return true;
+      const errBody = await res.text();
+      console.error(`Email send attempt ${attempt}/${attempts} to ${mailOptions.to} failed: ${res.status} ${errBody}`);
     } catch (err) {
       console.error(`Email send attempt ${attempt}/${attempts} to ${mailOptions.to} failed:`, err.message);
-      if (attempt < attempts) await new Promise(r => setTimeout(r, 2000 * attempt));
     }
+    if (attempt < attempts) await new Promise(r => setTimeout(r, 2000 * attempt));
   }
   return false;
 }
 
 async function sendContactEmail(message) {
   return sendMailSafe({
-    from: `"Natrio Organics Website" <${process.env.SMTP_USER}>`,
+    from: `"Natrio Organics Website" <${SENDER_EMAIL}>`,
     to: CONTACT_EMAIL,
     replyTo: message.email,
     subject: `New message from ${message.name} — Natrio Organics site`,
@@ -119,7 +133,7 @@ function orderItemsText(order) {
 }
 
 async function sendOrderConfirmationEmails(order) {
-  if (!mailTransporter) {
+  if (!BREVO_API_KEY) {
     console.log('Email not configured — skipping order confirmation emails.');
     return;
   }
@@ -129,7 +143,7 @@ async function sendOrderConfirmationEmails(order) {
   // email to the customer, if they gave one
   if (order.customer.email) {
     await sendMailSafe({
-      from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
+      from: `"Natrio Organics" <${SENDER_EMAIL}>`,
       to: order.customer.email,
       subject: `Your Natrio Organics order #${order.id} is confirmed`,
       text: `Hi ${order.customer.name.split(' ')[0]},\n\nThanks for your order! Here's a summary:\n\n${summary}\n\nWe'll email you again once it ships.\n\n— Natrio Organics`
@@ -138,7 +152,7 @@ async function sendOrderConfirmationEmails(order) {
 
   // email to the store owner
   await sendMailSafe({
-    from: `"Natrio Organics Website" <${process.env.SMTP_USER}>`,
+    from: `"Natrio Organics Website" <${SENDER_EMAIL}>`,
     to: CONTACT_EMAIL,
     subject: `New order #${order.id} — Rs. ${order.total}`,
     text: `A new order was placed.\n\n${summary}\n\nCustomer email: ${order.customer.email || 'not provided'}`
@@ -161,7 +175,7 @@ async function sendOrderStatusEmail(order, status) {
   if (!copy) return;
 
   await sendMailSafe({
-    from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
+    from: `"Natrio Organics" <${SENDER_EMAIL}>`,
     to: order.customer.email,
     subject: copy.subject,
     text: `Hi ${order.customer.name.split(' ')[0]},\n\n${copy.body}\n\n— Natrio Organics`
@@ -707,14 +721,14 @@ app.delete('/api/admin/subscribers/:email', requireAdmin, async (req, res) => {
 app.post('/api/admin/campaign/send', requireAdmin, async (req, res) => {
   const { subject, body, testEmail } = req.body;
   if (!subject || !body) return res.status(400).json({ error: 'Subject and body are required' });
-  if (!mailTransporter) {
-    return res.status(400).json({ error: 'Email isn\'t configured yet. Set SMTP_USER and SMTP_PASS first — see the README.' });
+  if (!BREVO_API_KEY) {
+    return res.status(400).json({ error: 'Email isn\'t configured yet. Set BREVO_API_KEY first — see the README.' });
   }
 
   // send a test to just yourself first, if requested, without touching the subscriber list
   if (testEmail) {
     const ok = await sendMailSafe({
-      from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
+      from: `"Natrio Organics" <${SENDER_EMAIL}>`,
       to: testEmail,
       subject: `[TEST] ${subject}`,
       html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.7;color:#222;">${body}</div>`
@@ -731,7 +745,7 @@ app.post('/api/admin/campaign/send', requireAdmin, async (req, res) => {
   for (const sub of subscribers) {
     const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/newsletter/unsubscribe?email=${encodeURIComponent(sub.email)}`;
     const ok = await sendMailSafe({
-      from: `"Natrio Organics" <${process.env.SMTP_USER}>`,
+      from: `"Natrio Organics" <${SENDER_EMAIL}>`,
       to: sub.email,
       subject,
       html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.7;color:#222;">${body}</div>
