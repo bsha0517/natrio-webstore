@@ -277,6 +277,72 @@ ${allUrls.map(u => `  <url>
   res.type('application/xml').send(xml);
 });
 
+// ---------- Google Shopping / Meta (Facebook & Instagram) product feed ----------
+// One combined feed serves both platforms — Google Merchant Center and Meta
+// Commerce Manager both accept this same RSS 2.0 + Google's "g:" namespace
+// format. Point either platform's "feed URL" setting at this endpoint and
+// they'll re-fetch it on a schedule (usually daily), so it always reflects
+// your current products, prices, and stock with no manual re-uploading.
+function xmlEscape(str) {
+  return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
+}
+function stripHtml(str) {
+  return String(str || '').replace(/<[^>]+>/g, '').trim();
+}
+const GOOGLE_PRODUCT_CATEGORY = {
+  'Hair Oils': 'Health & Beauty > Personal Care > Cosmetics > Hair Care Products > Hair Oil',
+  'Facial Care': 'Health & Beauty > Personal Care > Cosmetics > Skin Care Products'
+};
+
+app.get('/product-feed.xml', async (req, res) => {
+  const products = await readJSON(PRODUCTS_FILE);
+
+  const items = [];
+  for (const p of products) {
+    const variants = (p.variants && p.variants.length ? p.variants : [{ name: 'Default', price: p.price }]).map(v =>
+      (typeof v === 'object' && v !== null) ? { name: v.name, price: Number(v.price ?? p.price) } : { name: v, price: Number(p.price) }
+    );
+    const description = stripHtml(p.description) || p.title;
+    const imageUrl = p.image ? `${SITE_URL}${p.image}` : `${SITE_URL}/images/logo.png`;
+    const additionalImages = [p.hoverImage, p.image3, p.image4].filter(Boolean).map(img => `${SITE_URL}${img}`);
+    const category = GOOGLE_PRODUCT_CATEGORY[p.category] || '';
+    const availability = p.stock > 0 ? 'in stock' : 'out of stock';
+
+    variants.forEach((v, i) => {
+      const itemId = variants.length > 1 ? `${p.id}-${v.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : p.id;
+      items.push(`
+    <item>
+      <g:id>${xmlEscape(itemId)}</g:id>
+      <title>${xmlEscape(`${p.title}${variants.length > 1 ? ` - ${v.name}` : ''}`)}</title>
+      <description>${xmlEscape(description)}</description>
+      <link>${SITE_URL}/product.html?id=${encodeURIComponent(p.id)}</link>
+      <g:image_link>${xmlEscape(imageUrl)}</g:image_link>
+      ${additionalImages.map(img => `<g:additional_image_link>${xmlEscape(img)}</g:additional_image_link>`).join('\n      ')}
+      <g:availability>${availability}</g:availability>
+      <g:price>${v.price.toFixed(2)} PKR</g:price>
+      <g:brand>Natrio Organics</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      ${category ? `<g:google_product_category>${xmlEscape(category)}</g:google_product_category>` : ''}
+      ${variants.length > 1 ? `<g:item_group_id>${xmlEscape(p.id)}</g:item_group_id>` : ''}
+      <g:product_type>${xmlEscape(p.category || '')}</g:product_type>
+    </item>`);
+    });
+  }
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>Natrio Organics — Product Feed</title>
+    <link>${SITE_URL}</link>
+    <description>Natrio Organics product feed for Google Shopping and Meta (Facebook/Instagram) Shopping.</description>
+${items.join('')}
+  </channel>
+</rss>`;
+
+  res.type('application/xml').send(xml);
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------- helpers ----------

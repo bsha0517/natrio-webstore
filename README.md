@@ -628,3 +628,50 @@ Rs. 2500 | Use Code FIRST for 10% Off"). Add a single message to show it
 permanently, or add several and they rotate automatically every 4 seconds
 with a smooth fade — a mini slider, no extra setup needed. Takes effect
 on refresh, no redeploy required.
+
+## 24. Google Shopping & Meta (Facebook/Instagram) Shopping
+
+**`https://natrio.pk/product-feed.xml`** is a live product feed, generated
+automatically from your current products, prices, stock, and images — one
+feed that both Google Merchant Center and Meta Commerce Manager can read,
+since they both accept this same format. Once connected, each platform
+re-fetches this URL on its own schedule (usually daily), so listings stay
+current with zero manual work on your end — no re-uploading a spreadsheet
+every time a price changes.
+
+Products with multiple sizes (like Olive Hair Oil's 60ml/100ml) are listed
+as separate variants with the correct price for each, grouped together so
+Google/Meta display them as one product with size options rather than
+duplicate listings.
+
+**To connect Google Shopping:**
+1. Create a free [Google Merchant Center](https://merchants.google.com)
+   account and verify you own `natrio.pk` (Merchant Center walks you
+   through this — usually a DNS record or an HTML file upload).
+2. Go to **Products** → **Feeds** → add a new feed → choose **Scheduled
+   fetch** → paste in `https://natrio.pk/product-feed.xml`.
+3. Google reviews new feeds before products go live (can take a few days).
+   Once approved, connect Merchant Center to Google Ads if you want to run
+   Shopping ads, or products can appear in free Google Shopping listings
+   without any ad spend.
+
+**To connect Meta (Facebook & Instagram) Shopping:**
+1. Set up [Meta Commerce Manager](https://business.facebook.com/commerce)
+   under your Meta Business account.
+2. Create a catalog → **Add items** → **Use bulk upload** → **Data feed**
+   → paste in the same `https://natrio.pk/product-feed.xml` URL and set it
+   to fetch daily.
+3. Once approved, connect the catalog to your Facebook Page and Instagram
+   account to enable Shop tabs and shoppable posts.
+
+**Things worth knowing:**
+- Both platforms require your site to have working Privacy Policy,
+  Shipping/Returns, and Contact pages before approving a store — you
+  already have all three.
+- Prices don't include a GTIN/barcode (`identifier_exists: no` in the
+  feed) since these are handmade/small-batch products without standard
+  barcodes — this is expected and accepted by both platforms, not an error.
+- If a product's images look wrong or missing in Merchant Center/Commerce
+  Manager, double check that product actually has a `Main image` set in
+  `/admin.html` → Products — the feed can't show an image that doesn't
+  exist.
