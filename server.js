@@ -343,6 +343,125 @@ ${items.join('')}
   res.type('application/xml').send(xml);
 });
 
+// ---------- Server-rendered product page ----------
+// The static product.html previously shipped with just "Loading…" in its
+// body — all real content (title, price, description, images) only
+// appeared after client-side JavaScript fetched and injected it. That's
+// invisible to crawlers that don't fully execute JS, which is exactly
+// what Google Merchant Center flagged ("domain should provide customers
+// with unique, valuable content"). This route renders the real content
+// server-side before sending the page, so it's there immediately — with
+// or without JavaScript. The existing client-side script still runs
+// afterward for interactivity (variant switching, add to cart, tabs) and
+// simply replaces the same containers with an equivalent, fully-featured
+// version — no duplication, no conflict.
+const productPageTemplate = fs.readFileSync(path.join(__dirname, 'public', 'product.html'), 'utf-8');
+
+function normalizeVariants(p) {
+  return (p.variants && p.variants.length ? p.variants : [{ name: 'Default', price: p.price }]).map(v =>
+    (typeof v === 'object' && v !== null) ? { name: v.name, price: Number(v.price ?? p.price) } : { name: v, price: Number(p.price) }
+  );
+}
+
+app.get('/product.html', async (req, res) => {
+  const id = req.query.id;
+  const products = await readJSON(PRODUCTS_FILE);
+  const p = id ? products.find(x => x.id === id) : null;
+
+  if (!p) {
+    // no id, or not found — let the client-side JS handle the "not found" state as before
+    return res.send(productPageTemplate);
+  }
+
+  const variants = normalizeVariants(p);
+  const shortDesc = xmlEscape((p.shortDescription || stripHtml(p.description) || p.title).slice(0, 155));
+  const pageUrl = `${SITE_URL}/product.html?id=${encodeURIComponent(p.id)}`;
+  const imgUrl = p.image ? `${SITE_URL}${p.image}` : `${SITE_URL}/images/logo.png`;
+  const inStock = p.stock > 0;
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: p.title,
+    image: [p.image, p.hoverImage, p.image3, p.image4].filter(Boolean).map(src => `${SITE_URL}${src}`),
+    description: stripHtml(p.description) || p.title,
+    sku: p.sku || p.id,
+    brand: { '@type': 'Brand', name: 'Natrio Organics' },
+    offers: {
+      '@type': 'AggregateOffer',
+      url: pageUrl,
+      priceCurrency: 'PKR',
+      lowPrice: Math.min(...variants.map(v => v.price)),
+      highPrice: Math.max(...variants.map(v => v.price)),
+      offerCount: variants.length,
+      availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock'
+    }
+  };
+
+  const ssrBreadcrumb = `
+    <a href="/">Home</a><span class="sep">/</span>
+    <a href="/products.html?category=${encodeURIComponent(p.category)}">${xmlEscape(p.category)}</a><span class="sep">/</span>
+    <span class="current">${xmlEscape(p.title)}</span>`;
+
+  const ssrContent = `
+    <div>
+      <div class="pd-gallery-main"><img src="${xmlEscape(imgUrl)}" alt="${xmlEscape(p.title)}" style="width:100%;height:100%;object-fit:cover;"></div>
+    </div>
+    <div>
+      <span class="category" style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:${p.category === 'Facial Care' ? 'var(--rose)' : 'var(--gold)'};">${xmlEscape(p.category)}</span>
+      <h1 class="pd-title">${xmlEscape(p.title)}</h1>
+      <div class="pd-meta">
+        <strong>Vendor:</strong> Natrio Organics<br>
+        <strong>Availability:</strong> ${inStock ? 'In Stock' : 'Out of Stock'}<br>
+        <strong>Category:</strong> ${xmlEscape(p.category)}
+      </div>
+      <p class="pd-desc">${shortDesc}</p>
+      <div class="pd-price">Rs. ${variants[0].price.toLocaleString()}${variants.length > 1 ? ' – Rs. ' + Math.max(...variants.map(v => v.price)).toLocaleString() : ''}</div>
+      <p>${stripHtml(p.description) ? xmlEscape(stripHtml(p.description)) : ''}</p>
+    </div>`;
+
+  let html = productPageTemplate
+    .replace('<title>Product — Natrio Organics</title>', `<title>${xmlEscape(p.title)} — Natrio Organics</title>`)
+    .replace(
+      '<meta name="description" id="metaDescription" content="Shop pure, cold-pressed oils from Natrio Organics.">',
+      `<meta name="description" id="metaDescription" content="${shortDesc}">`
+    )
+    .replace(
+      '<link rel="canonical" id="canonicalLink" href="https://natrio.pk/product.html">',
+      `<link rel="canonical" id="canonicalLink" href="${pageUrl}">`
+    )
+    .replace(
+      '<meta property="og:title" id="ogTitle" content="Natrio Organics">',
+      `<meta property="og:title" id="ogTitle" content="${xmlEscape(p.title)} — Natrio Organics">`
+    )
+    .replace(
+      '<meta property="og:description" id="ogDescription" content="Shop pure, cold-pressed oils from Natrio Organics.">',
+      `<meta property="og:description" id="ogDescription" content="${shortDesc}">`
+    )
+    .replace(
+      '<meta property="og:url" id="ogUrl" content="https://natrio.pk/product.html">',
+      `<meta property="og:url" id="ogUrl" content="${pageUrl}">`
+    )
+    .replace(
+      '<meta property="og:image" id="ogImage" content="https://natrio.pk/images/logo.png">',
+      `<meta property="og:image" id="ogImage" content="${xmlEscape(imgUrl)}">`
+    )
+    .replace(
+      '</head>',
+      `  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>\n</head>`
+    )
+    .replace(
+      '<div class="breadcrumb" id="breadcrumb"></div>',
+      `<div class="breadcrumb" id="breadcrumb">${ssrBreadcrumb}</div>`
+    )
+    .replace(
+      '<div class="pd-layout" id="pd">Loading…</div>',
+      `<div class="pd-layout" id="pd">${ssrContent}</div>`
+    );
+
+  res.send(html);
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------- helpers ----------

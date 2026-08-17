@@ -675,3 +675,34 @@ duplicate listings.
   Manager, double check that product actually has a `Main image` set in
   `/admin.html` → Products — the feed can't show an image that doesn't
   exist.
+
+**If Google Merchant Center rejects your site** with a message like "your
+domain should provide customers with unique, valuable content" — this was
+fixed as of the server-rendered product pages below (section 25), but if
+it recurs, it's almost always because a crawler saw a page before its
+JavaScript finished loading real content. Product pages specifically are
+now server-rendered to avoid this; if the same issue comes up for the
+homepage or category pages later, those would need the same treatment.
+
+## 25. Server-rendered product pages (fixes Google Merchant Center rejections)
+
+Product pages (`/product.html?id=...`) used to ship as a mostly-empty page
+that said "Loading…" — all the real content (title, price, description,
+images) only appeared after JavaScript ran in a browser. That's invisible
+to crawlers that don't fully execute JavaScript, including Google Merchant
+Center's — which is what causes the rejection message: *"Your domain
+should provide customers with unique, valuable content."*
+
+Product pages are now rendered server-side: the actual product title,
+price, description, image, and `Product` structured data are all present
+in the very first response the server sends, before any JavaScript runs.
+Real visitors don't notice a difference — the same client-side script
+still runs afterward and upgrades the page to the full interactive version
+(variant selector, image gallery, tabs, Add to Cart) exactly as before.
+This was verified against every real product in the database, including
+ones with multiple size variants, before shipping.
+
+**After deploying this,** request a review in Google Merchant Center
+(Products → Diagnostics, or wherever the rejection notice appeared) so
+Google re-crawls your site with the fix in place — it won't re-check
+automatically on its own schedule for a flagged account.
