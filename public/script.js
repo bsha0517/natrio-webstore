@@ -235,13 +235,17 @@ function loadGoogleCustomerReviewsBadge() {
     const script = document.createElement('script');
     script.id = 'merchantWidgetScript';
     script.src = 'https://www.gstatic.com/shopping/merchant/merchantwidget.js';
-    script.defer = true;
     script.addEventListener('load', function () {
-      window.merchantwidget.start({
-        merchant_id: Number(settings.googleMerchantId),
-        position: 'BOTTOM_LEFT',
-        region: 'PK'
-      });
+      try {
+        window.merchantwidget.start({
+          merchant_id: Number(settings.googleMerchantId)
+        });
+      } catch (err) {
+        console.error('Google Customer Reviews badge failed to start:', err);
+      }
+    });
+    script.addEventListener('error', function () {
+      console.error('Google Customer Reviews badge script failed to load (blocked by an ad blocker/extension, or a network issue).');
     });
     document.body.appendChild(script);
   }).catch(() => {});

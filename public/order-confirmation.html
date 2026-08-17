@@ -33,21 +33,30 @@
     function tryShowGoogleOptIn() {
       if (!googlePlatformReady || !orderReadyForOptIn) return;
       const { order, settings } = orderReadyForOptIn;
-      if (!settings.googleMerchantId || !order.customer.email) return;
+      if (!settings.googleMerchantId) { console.log('Google Customer Reviews: no Merchant ID set in admin Settings — skipping opt-in.'); return; }
+      if (!order.customer.email) { console.log('Google Customer Reviews: this order has no customer email — skipping opt-in.'); return; }
 
       // estimate delivery a few days out, matching the site's stated 1–3 business day delivery window
       const estimated = new Date(order.date);
       estimated.setDate(estimated.getDate() + 3);
       const estimatedDeliveryDate = estimated.toISOString().split('T')[0];
 
+      const optInConfig = {
+        merchant_id: Number(settings.googleMerchantId),
+        order_id: order.id,
+        email: order.customer.email,
+        delivery_country: 'PK',
+        estimated_delivery_date: estimatedDeliveryDate
+      };
+      console.log('Google Customer Reviews: attempting to render opt-in with', optInConfig);
+
       window.gapi.load('surveyoptin', function () {
-        window.gapi.surveyoptin.render({
-          merchant_id: Number(settings.googleMerchantId),
-          order_id: order.id,
-          email: order.customer.email,
-          delivery_country: 'PK',
-          estimated_delivery_date: estimatedDeliveryDate
-        });
+        try {
+          window.gapi.surveyoptin.render(optInConfig);
+          console.log('Google Customer Reviews: gapi.surveyoptin.render() called successfully. If nothing appears, this is very likely Google frequency-capping the popup (it will not re-show repeatedly to the same browser/order), an ad blocker, or a site verification issue in Merchant Center — not a bug in this call.');
+        } catch (err) {
+          console.error('Google Customer Reviews: render() threw an error:', err);
+        }
       });
     }
 
