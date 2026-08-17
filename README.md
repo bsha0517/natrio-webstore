@@ -706,3 +706,23 @@ ones with multiple size variants, before shipping.
 (Products → Diagnostics, or wherever the rejection notice appeared) so
 Google re-crawls your site with the fix in place — it won't re-check
 automatically on its own schedule for a flagged account.
+
+## 26. Google Customer Reviews
+
+`/admin.html` → **Settings** → **Google Customer Reviews** — paste in your
+Google Merchant Center ID (a numeric ID, found in Merchant Center →
+Settings → Business information) and two things turn on automatically:
+
+- **Opt-in survey** — right after a customer checks out, a small Google
+  popup asks if they'd like to rate their experience once the order
+  arrives. This uses the real order ID, the customer's email, and an
+  estimated delivery date calculated from the order date (matching the
+  site's stated 1–3 business day delivery window).
+- **Seller rating badge** — a floating widget in the bottom-left corner of
+  every page (kept clear of the WhatsApp button, which sits bottom-right)
+  showing your accumulated star rating once you have enough reviews for
+  Google to display one.
+
+Leave the Merchant ID blank and neither loads — no performance cost either
+way. This is the same Merchant Center account used for the product feed in
+section 24, so you likely already have the ID from setting that up.

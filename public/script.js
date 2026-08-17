@@ -224,6 +224,29 @@ function renderWhatsAppButton() {
 // TikTok Pixel — but only whichever ones you've actually configured in
 // /admin.html → Settings. Nothing renders or slows the site down for any
 // platform left blank.
+// Google Customer Reviews seller-rating badge — the floating widget shown
+// in the corner of every page once you've collected enough reviews via
+// the opt-in survey (see the order confirmation page). Only loads if a
+// Google Merchant Center ID is set in /admin.html → Settings.
+function loadGoogleCustomerReviewsBadge() {
+  fetch('/api/settings').then(r => r.json()).then(settings => {
+    if (!settings.googleMerchantId) return;
+
+    const script = document.createElement('script');
+    script.id = 'merchantWidgetScript';
+    script.src = 'https://www.gstatic.com/shopping/merchant/merchantwidget.js';
+    script.defer = true;
+    script.addEventListener('load', function () {
+      window.merchantwidget.start({
+        merchant_id: Number(settings.googleMerchantId),
+        position: 'BOTTOM_LEFT',
+        region: 'PK'
+      });
+    });
+    document.body.appendChild(script);
+  }).catch(() => {});
+}
+
 function loadAnalytics() {
   fetch('/api/settings').then(r => r.json()).then(settings => {
     // ---- Google (GA4 + Google Ads share the same gtag.js loader) ----
@@ -290,4 +313,5 @@ document.addEventListener('DOMContentLoaded', () => {
   renderWhatsAppButton();
   refreshCartCount();
   loadAnalytics();
+  loadGoogleCustomerReviewsBadge();
 });

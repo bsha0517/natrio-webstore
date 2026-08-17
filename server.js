@@ -761,7 +761,8 @@ app.get('/api/settings', async (req, res) => {
     googleAdsConversionLabel: settings.googleAdsConversionLabel || '',
     jazzCashNumber: settings.jazzCashNumber || '',
     easypaisaNumber: settings.easypaisaNumber || '',
-    walletAccountTitle: settings.walletAccountTitle || ''
+    walletAccountTitle: settings.walletAccountTitle || '',
+    googleMerchantId: settings.googleMerchantId || ''
   });
 });
 
@@ -1508,7 +1509,7 @@ app.get('/api/admin/settings', requireAdmin, async (req, res) => {
 });
 
 app.put('/api/admin/settings', requireAdmin, async (req, res) => {
-  const { gaTrackingId, googleReviewUrl, metaPixelId, tiktokPixelId, googleAdsId, googleAdsConversionLabel, jazzCashNumber, easypaisaNumber, walletAccountTitle } = req.body;
+  const { gaTrackingId, googleReviewUrl, metaPixelId, tiktokPixelId, googleAdsId, googleAdsConversionLabel, jazzCashNumber, easypaisaNumber, walletAccountTitle, googleMerchantId } = req.body;
   const settings = {
     gaTrackingId: gaTrackingId || '',
     googleReviewUrl: googleReviewUrl || '',
@@ -1518,7 +1519,8 @@ app.put('/api/admin/settings', requireAdmin, async (req, res) => {
     googleAdsConversionLabel: googleAdsConversionLabel || '',
     jazzCashNumber: jazzCashNumber || '',
     easypaisaNumber: easypaisaNumber || '',
-    walletAccountTitle: walletAccountTitle || ''
+    walletAccountTitle: walletAccountTitle || '',
+    googleMerchantId: googleMerchantId || ''
   };
   await writeJSON(SETTINGS_FILE, settings);
   res.json({ success: true, settings });

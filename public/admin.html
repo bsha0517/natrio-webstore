@@ -421,6 +421,17 @@
 
         <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:18px;">Save Settings</button>
       </div>
+
+      <div style="border:1px solid var(--line);background:white;padding:20px;max-width:560px;margin-top:20px;">
+        <h3 style="font-size:15px;margin-bottom:6px;">Google Customer Reviews</h3>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 16px;">Once you have a Merchant ID, two things turn on automatically: a small "rate your experience" survey pops up for customers right after they check out, and a floating seller-rating badge appears in the bottom-left corner of every page once you've collected enough reviews.</p>
+
+        <label>Google Merchant Center ID</label>
+        <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">From Merchant Center → Settings → Business information, or the URL when you're logged in (a long number). Leave blank to turn this off.</p>
+        <input id="settingsMerchantId" placeholder="e.g. 5839817554">
+
+        <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:18px;">Save Settings</button>
+      </div>
     </div>
 
     <div id="heroTab" class="hidden">
@@ -1420,6 +1431,7 @@
       document.getElementById('settingsJazzCash').value = settings.jazzCashNumber || '';
       document.getElementById('settingsEasypaisa').value = settings.easypaisaNumber || '';
       document.getElementById('settingsWalletTitle').value = settings.walletAccountTitle || '';
+      document.getElementById('settingsMerchantId').value = settings.googleMerchantId || '';
     }
 
     async function saveSettings() {
@@ -1432,7 +1444,8 @@
         googleAdsConversionLabel: document.getElementById('settingsGoogleAdsLabel').value.trim(),
         jazzCashNumber: document.getElementById('settingsJazzCash').value.trim(),
         easypaisaNumber: document.getElementById('settingsEasypaisa').value.trim(),
-        walletAccountTitle: document.getElementById('settingsWalletTitle').value.trim()
+        walletAccountTitle: document.getElementById('settingsWalletTitle').value.trim(),
+        googleMerchantId: document.getElementById('settingsMerchantId').value.trim()
       };
       const res = await fetch('/api/admin/settings', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },

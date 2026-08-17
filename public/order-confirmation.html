@@ -9,6 +9,7 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
   <link rel="apple-touch-icon" href="/images/favicon-180.png">
   <link rel="stylesheet" href="/style.css">
+  <script src="https://apis.google.com/js/platform.js?onload=renderOptIn" async defer></script>
 </head>
 <body>
   <div class="section" style="max-width:560px;margin:0 auto;text-align:center;">
@@ -16,6 +17,40 @@
   </div>
   <script src="/script.js"></script>
   <script>
+    // Google Customer Reviews opt-in survey. platform.js loads
+    // asynchronously and calls window.renderOptIn() once ready — but our
+    // own order/settings data is also fetched asynchronously, so either
+    // one could finish first. This waits for both before actually
+    // rendering the survey.
+    let googlePlatformReady = false;
+    let orderReadyForOptIn = null; // set once order + settings are both loaded
+
+    window.renderOptIn = function () {
+      googlePlatformReady = true;
+      tryShowGoogleOptIn();
+    };
+
+    function tryShowGoogleOptIn() {
+      if (!googlePlatformReady || !orderReadyForOptIn) return;
+      const { order, settings } = orderReadyForOptIn;
+      if (!settings.googleMerchantId || !order.customer.email) return;
+
+      // estimate delivery a few days out, matching the site's stated 1–3 business day delivery window
+      const estimated = new Date(order.date);
+      estimated.setDate(estimated.getDate() + 3);
+      const estimatedDeliveryDate = estimated.toISOString().split('T')[0];
+
+      window.gapi.load('surveyoptin', function () {
+        window.gapi.surveyoptin.render({
+          merchant_id: Number(settings.googleMerchantId),
+          order_id: order.id,
+          email: order.customer.email,
+          delivery_country: 'PK',
+          estimated_delivery_date: estimatedDeliveryDate
+        });
+      });
+    }
+
     const id = new URLSearchParams(location.search).get('id');
     fetch(`/api/order/${id}`).then(r => r.json()).then(order => {
       if (order.error) {
@@ -85,6 +120,13 @@
           contents: order.items.map(i => ({ content_id: i.productId, quantity: i.qty, price: i.price }))
         });
       }
+
+      // Google Customer Reviews opt-in — fetch settings, then trigger
+      // the survey once both this and platform.js are ready
+      fetch('/api/settings').then(r => r.json()).then(settings => {
+        orderReadyForOptIn = { order, settings };
+        tryShowGoogleOptIn();
+      }).catch(() => {});
     });
   </script>
 </body>
