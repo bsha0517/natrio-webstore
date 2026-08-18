@@ -9,6 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const emailTemplates = require('./email-templates');
 
 const app = express();
+app.disable('x-powered-by'); // don't advertise the tech stack in response headers
 const PORT = process.env.PORT || 3000;
 
 // ---------- Data storage keys ----------
@@ -341,6 +342,89 @@ ${items.join('')}
 </rss>`;
 
   res.type('application/xml').send(xml);
+});
+
+// ---------- Server-rendered homepage ----------
+// Same underlying problem as the product pages, worse here: the raw HTML
+// shipped an empty hero, empty category strip, and empty bestseller
+// slider — no H1, essentially no text, no internal links — everything
+// only appeared once JavaScript ran. That's what an SEO crawler sees as
+// "75 words, 1 paragraph, no H1, few internal links." This renders a
+// real H1, genuine prose content, and real product/category links
+// directly into the response. The existing client-side script still
+// runs afterward and replaces the same containers with the full
+// interactive version (image sliders, hover effects, etc.) exactly as
+// before — this only changes what's there before JS has run.
+const homePageTemplate = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf-8');
+
+app.get('/', async (req, res) => {
+  const [heroSlides, categories, products] = await Promise.all([
+    readJSON(HERO_FILE), readJSON(CATEGORIES_FILE), readJSON(PRODUCTS_FILE)
+  ]);
+
+  const hero = heroSlides[0] || {};
+  const heroHeading = hero.heading || 'Pure Cold-Pressed Oils, Made in Pakistan';
+  const heroEyebrow = hero.eyebrow || 'Cold Pressed · Chemical Free';
+  const heroSubtext = hero.subtext || 'Nourish your hair and skin naturally with oils sourced, pressed, and bottled with care.';
+  const heroButtonText = hero.buttonText || 'Shop Now';
+  const heroButtonUrl = hero.buttonUrl || '/products.html';
+
+  const ssrHero = `
+    <div class="hero-slide active" data-index="0">
+      ${hero.image ? `<div class="hero-bg" style="background-image:url('${xmlEscape(hero.image)}')"></div>` : ''}
+      <div class="hero-inner">
+        <span class="eyebrow">${xmlEscape(heroEyebrow)}</span>
+        <h1>${xmlEscape(heroHeading)}</h1>
+        <p>${xmlEscape(heroSubtext)}</p>
+        <a href="${xmlEscape(heroButtonUrl)}" class="btn btn-primary">${xmlEscape(heroButtonText)}</a>
+      </div>
+    </div>`;
+
+  const ssrCategories = categories.map(c => `
+    <a class="category-tile" href="${xmlEscape(c.url || `/products.html?category=${encodeURIComponent(c.title)}`)}">
+      <div class="cat-thumb" style="${c.image ? `background-image:url('${xmlEscape(c.image)}')` : ''}"></div>
+      <span class="cat-label">${xmlEscape(c.title)}</span>
+    </a>`).join('');
+
+  const bestsellers = products.filter(p => p.bestseller);
+  const bestsellerList = (bestsellers.length ? bestsellers : products).slice(0, 8);
+  const ssrBestsellers = bestsellerList.map(p => {
+    const variants = normalizeVariants(p);
+    return `
+    <div class="product-card">
+      <a href="/product.html?id=${encodeURIComponent(p.id)}">
+        <div class="thumb">${p.image ? `<img src="${xmlEscape(p.image)}" alt="${xmlEscape(p.title)}">` : ''}</div>
+      </a>
+      <div class="body">
+        <span class="category">${xmlEscape(p.category || '')}</span>
+        <h3><a href="/product.html?id=${encodeURIComponent(p.id)}">${xmlEscape(p.title)}</a></h3>
+        <div class="price">Rs. ${variants[0].price.toLocaleString()}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Real, substantial homepage copy — not filler. Written to naturally
+  // include the page title's key terms (Natrio Organics, cold-pressed,
+  // oils, Pakistan) and link to real internal pages.
+  const ssrIntro = `
+  <section class="section" style="max-width:820px;margin:0 auto;">
+    <div class="section-header">
+      <span class="eyebrow">Our Story</span>
+      <h2>Pure, Cold-Pressed Oils — From Our Fields to Your Routine</h2>
+    </div>
+    <p>Natrio Organics makes pure, cold-pressed hair oils and facial care products in Lahore, Pakistan. Every bottle starts with carefully sourced seeds — olive, taramira, coconut, onion, and rosehip among them — pressed slowly to preserve their natural nutrients, rather than extracted with heat or diluted with cheap filler oils the way many mass-market products are.</p>
+    <p>We started Natrio Organics after struggling to find hair oils in Pakistan that were actually what they claimed to be. Too many bottles on the shelf were mostly synthetic fragrance and low-quality cooking oil dressed up as something premium. Coming from a farming family gave us direct access to good seeds and traditional cold-pressing knowledge — so we decided to bottle it ourselves and offer something honest.</p>
+    <p>Today, that means <a href="/products.html?category=Hair%20Oils">cold-pressed hair oils</a> like Olive, Coconut, Taramira, and Onion oil, alongside a small <a href="/products.html?category=Facial%20Care">facial care</a> range built around the same principle: real ingredients, nothing hidden. Every product ships nationwide across Pakistan with Cash on Delivery available, so you can try it risk-free.</p>
+    <p>You can browse our full range on the <a href="/products.html">shop page</a>, read more about how we got started on our <a href="/about-us.html">About Us</a> page, or find Natrio Organics in person at select retail partners in Lahore via our <a href="/find-us-in-store.html">store locations page</a>. However you shop with us, every bottle is made in small batches, cold-pressed, and free of the fillers that crowd most of the market.</p>
+  </section>`;
+
+  const html = homePageTemplate
+    .replace('<div id="heroSlides"></div>', `<div id="heroSlides">${ssrHero}</div>`)
+    .replace('<div class="category-strip" id="categoryStrip"></div>', `<div class="category-strip" id="categoryStrip">${ssrCategories}</div>`)
+    .replace('<div class="slider-row" id="bestsellerSlider"></div>', `<div class="slider-row" id="bestsellerSlider">${ssrBestsellers}</div>`)
+    .replace('<!-- CATEGORY TILES -->', `<!-- CATEGORY TILES -->\n  ${ssrIntro}`);
+
+  res.send(html);
 });
 
 // ---------- Server-rendered product page ----------

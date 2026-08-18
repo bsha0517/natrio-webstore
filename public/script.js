@@ -109,7 +109,7 @@ function renderFooter() {
           </div>
         </div>
         <div>
-          <h4>Shop</h4>
+          <h3>Shop</h3>
           <ul>
             <li><a href="/products.html?category=Hair%20Oils">Hair Oils</a></li>
             <li><a href="/products.html?category=Facial%20Care">Facial Care</a></li>
@@ -117,7 +117,7 @@ function renderFooter() {
           </ul>
         </div>
         <div>
-          <h4>Information</h4>
+          <h3>Information</h3>
           <ul>
             <li><a href="/about-us.html">About Us</a></li>
             <li><a href="/find-us-in-store.html">Find Us In Store</a></li>
@@ -129,7 +129,7 @@ function renderFooter() {
           </ul>
         </div>
         <div class="newsletter-mini">
-          <h4>Let's get in touch</h4>
+          <h3>Let's get in touch</h3>
           <p>Join the list &amp; get 10% off your first order — your glow-up starts here ✨</p>
           <input type="email" placeholder="Enter your email address" id="newsletterEmail">
           <button class="btn btn-primary btn-full" type="button" onclick="subscribeNewsletter()">Subscribe</button>

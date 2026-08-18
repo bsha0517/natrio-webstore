@@ -280,7 +280,7 @@ footer.site-footer.dark-footer {
 }
 .dark-footer .social-row a img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .dark-footer .social-row a:hover { transform: scale(1.08); }
-.dark-footer h4 { color: var(--gold); font-size: 14px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 16px; font-family: 'Jost'; font-weight: 600; }
+.dark-footer h3 { color: var(--gold); font-size: 14px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 16px; font-family: 'Jost'; font-weight: 600; }
 .dark-footer ul { list-style: none; margin: 0; padding: 0; }
 .dark-footer li { margin-bottom: 10px; font-size: 14px; opacity: .8; }
 .dark-footer li a:hover { color: var(--gold); }

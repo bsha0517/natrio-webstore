@@ -726,3 +726,31 @@ Settings → Business information) and two things turn on automatically:
 Leave the Merchant ID blank and neither loads — no performance cost either
 way. This is the same Merchant Center account used for the product feed in
 section 24, so you likely already have the ID from setting that up.
+
+## 27. Homepage SEO fixes
+
+The homepage used to ship with an empty hero, empty category strip, and
+empty bestseller slider — everything only appeared once JavaScript ran in
+a browser. To any SEO crawler that doesn't fully execute JavaScript
+(including some auditing tools), that looked like a nearly blank page: no
+H1, ~75 words total, one paragraph, almost no internal links. Fixed the
+same way as the product pages (section 25) — real content, including a
+genuine H1, ~250+ words of homepage copy about the brand, and real
+product/category links, now renders directly in the server's response
+before any JavaScript runs. The existing client-side script still runs
+afterward and upgrades the same containers to the full interactive version
+(image sliders, rotating hero, hover effects) exactly as before.
+
+Also fixed along the way:
+- **Skipped heading level** — the footer's section titles ("Shop",
+  "Information", "Let's get in touch") were `<h4>` tags with no `<h3>`
+  anywhere else on the page, which is an actual accessibility/SEO problem
+  independent of the JS-rendering issue above. Changed to `<h3>`.
+- **`X-Powered-By` response header** — Express sends this by default,
+  revealing your tech stack to anyone inspecting response headers. Now
+  disabled site-wide.
+
+These fixes were verified against the real content in your database (not
+sample data) before shipping — word count, H1 count, heading level
+presence, internal link count, and whether the page title's key words
+actually appear in the visible content were all checked directly.
