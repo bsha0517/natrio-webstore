@@ -143,11 +143,15 @@
 
   <script src="/script.js"></script>
   <script>
+    function slugify(str) {
+      return String(str || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    }
+
     function productCard(p) {
       const hover = p.hoverImage ? `<img class="img-alt" src="${p.hoverImage}" alt="" onerror="this.remove()">` : '';
       return `
         <div class="product-card">
-          <a href="/product.html?id=${p.id}">
+          <a href="/product/${p.id}">
             <div class="thumb">
               ${p.image
                 ? `<img class="img-main" src="${p.image}" alt="${p.title}" onerror="this.parentElement.innerHTML='<span class=placeholder>${p.title}</span>'">${hover}`
@@ -156,7 +160,7 @@
           </a>
           <div class="body">
             <span class="category ${p.category === 'Facial Care' ? 'rose' : ''}">${p.category}</span>
-            <h3><a href="/product.html?id=${p.id}">${p.title}</a></h3>
+            <h3><a href="/product/${p.id}">${p.title}</a></h3>
             <div class="price">${money(p.price)}</div>
             <button class="add-btn" onclick="addToCart('${p.id}','${(p.variants[0] && p.variants[0].name) || p.variants[0]}',1).then(()=>this.textContent='Added ✓')">Add to Cart</button>
           </div>
@@ -172,7 +176,7 @@
     // Categories
     fetch('/api/categories').then(r => r.json()).then(list => {
       document.getElementById('categoryStrip').innerHTML = list.map(c => `
-        <a class="category-tile" href="${c.url}">
+        <a class="category-tile" href="/products/${slugify(c.title)}">
           <div class="cat-thumb" style="background-image:url('${c.image}')"></div>
           <span class="cat-label">${c.title}</span>
         </a>

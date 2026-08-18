@@ -248,12 +248,12 @@ app.get('/sitemap.xml', async (req, res) => {
   ];
 
   const categoryUrls = categories.map(c => ({
-    loc: `/products.html?category=${encodeURIComponent(c.title)}`,
+    loc: `/products/${categorySlug(c.title)}`,
     priority: '0.7', changefreq: 'weekly'
   }));
 
   const productUrls = products.map(p => ({
-    loc: `/product.html?id=${p.id}`,
+    loc: `/product/${p.id}`,
     priority: '0.8', changefreq: 'weekly'
   }));
 
@@ -316,7 +316,7 @@ app.get('/product-feed.xml', async (req, res) => {
       <g:id>${xmlEscape(itemId)}</g:id>
       <title>${xmlEscape(`${p.title}${variants.length > 1 ? ` - ${v.name}` : ''}`)}</title>
       <description>${xmlEscape(description)}</description>
-      <link>${SITE_URL}/product.html?id=${encodeURIComponent(p.id)}</link>
+      <link>${SITE_URL}/product/${encodeURIComponent(p.id)}</link>
       <g:image_link>${xmlEscape(imageUrl)}</g:image_link>
       ${additionalImages.map(img => `<g:additional_image_link>${xmlEscape(img)}</g:additional_image_link>`).join('\n      ')}
       <g:availability>${availability}</g:availability>
@@ -381,7 +381,7 @@ app.get('/', async (req, res) => {
     </div>`;
 
   const ssrCategories = categories.map(c => `
-    <a class="category-tile" href="${xmlEscape(c.url || `/products.html?category=${encodeURIComponent(c.title)}`)}">
+    <a class="category-tile" href="/products/${categorySlug(c.title)}">
       <div class="cat-thumb" style="${c.image ? `background-image:url('${xmlEscape(c.image)}')` : ''}"></div>
       <span class="cat-label">${xmlEscape(c.title)}</span>
     </a>`).join('');
@@ -392,37 +392,21 @@ app.get('/', async (req, res) => {
     const variants = normalizeVariants(p);
     return `
     <div class="product-card">
-      <a href="/product.html?id=${encodeURIComponent(p.id)}">
+      <a href="/product/${encodeURIComponent(p.id)}">
         <div class="thumb">${p.image ? `<img src="${xmlEscape(p.image)}" alt="${xmlEscape(p.title)}">` : ''}</div>
       </a>
       <div class="body">
         <span class="category">${xmlEscape(p.category || '')}</span>
-        <h3><a href="/product.html?id=${encodeURIComponent(p.id)}">${xmlEscape(p.title)}</a></h3>
+        <h3><a href="/product/${encodeURIComponent(p.id)}">${xmlEscape(p.title)}</a></h3>
         <div class="price">Rs. ${variants[0].price.toLocaleString()}</div>
       </div>
     </div>`;
   }).join('');
 
-  // Real, substantial homepage copy — not filler. Written to naturally
-  // include the page title's key terms (Natrio Organics, cold-pressed,
-  // oils, Pakistan) and link to real internal pages.
-  const ssrIntro = `
-  <section class="section" style="max-width:820px;margin:0 auto;">
-    <div class="section-header">
-      <span class="eyebrow">Our Story</span>
-      <h2>Pure, Cold-Pressed Oils — From Our Fields to Your Routine</h2>
-    </div>
-    <p>Natrio Organics makes pure, cold-pressed hair oils and facial care products in Lahore, Pakistan. Every bottle starts with carefully sourced seeds — olive, taramira, coconut, onion, and rosehip among them — pressed slowly to preserve their natural nutrients, rather than extracted with heat or diluted with cheap filler oils the way many mass-market products are.</p>
-    <p>We started Natrio Organics after struggling to find hair oils in Pakistan that were actually what they claimed to be. Too many bottles on the shelf were mostly synthetic fragrance and low-quality cooking oil dressed up as something premium. Coming from a farming family gave us direct access to good seeds and traditional cold-pressing knowledge — so we decided to bottle it ourselves and offer something honest.</p>
-    <p>Today, that means <a href="/products.html?category=Hair%20Oils">cold-pressed hair oils</a> like Olive, Coconut, Taramira, and Onion oil, alongside a small <a href="/products.html?category=Facial%20Care">facial care</a> range built around the same principle: real ingredients, nothing hidden. Every product ships nationwide across Pakistan with Cash on Delivery available, so you can try it risk-free.</p>
-    <p>You can browse our full range on the <a href="/products.html">shop page</a>, read more about how we got started on our <a href="/about-us.html">About Us</a> page, or find Natrio Organics in person at select retail partners in Lahore via our <a href="/find-us-in-store.html">store locations page</a>. However you shop with us, every bottle is made in small batches, cold-pressed, and free of the fillers that crowd most of the market.</p>
-  </section>`;
-
   const html = homePageTemplate
     .replace('<div id="heroSlides"></div>', `<div id="heroSlides">${ssrHero}</div>`)
     .replace('<div class="category-strip" id="categoryStrip"></div>', `<div class="category-strip" id="categoryStrip">${ssrCategories}</div>`)
-    .replace('<div class="slider-row" id="bestsellerSlider"></div>', `<div class="slider-row" id="bestsellerSlider">${ssrBestsellers}</div>`)
-    .replace('<!-- CATEGORY TILES -->', `<!-- CATEGORY TILES -->\n  ${ssrIntro}`);
+    .replace('<div class="slider-row" id="bestsellerSlider"></div>', `<div class="slider-row" id="bestsellerSlider">${ssrBestsellers}</div>`);
 
   res.send(html);
 });
@@ -447,19 +431,19 @@ function normalizeVariants(p) {
   );
 }
 
-app.get('/product.html', async (req, res) => {
-  const id = req.query.id;
+function categorySlug(title) {
+  return String(title || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+async function renderProductPage(id) {
   const products = await readJSON(PRODUCTS_FILE);
   const p = id ? products.find(x => x.id === id) : null;
 
-  if (!p) {
-    // no id, or not found — let the client-side JS handle the "not found" state as before
-    return res.send(productPageTemplate);
-  }
+  if (!p) return productPageTemplate; // let client-side JS handle the "not found" state
 
   const variants = normalizeVariants(p);
   const shortDesc = xmlEscape((p.shortDescription || stripHtml(p.description) || p.title).slice(0, 155));
-  const pageUrl = `${SITE_URL}/product.html?id=${encodeURIComponent(p.id)}`;
+  const pageUrl = `${SITE_URL}/product/${encodeURIComponent(p.id)}`;
   const imgUrl = p.image ? `${SITE_URL}${p.image}` : `${SITE_URL}/images/logo.png`;
   const inStock = p.stock > 0;
 
@@ -484,7 +468,7 @@ app.get('/product.html', async (req, res) => {
 
   const ssrBreadcrumb = `
     <a href="/">Home</a><span class="sep">/</span>
-    <a href="/products.html?category=${encodeURIComponent(p.category)}">${xmlEscape(p.category)}</a><span class="sep">/</span>
+    <a href="/products/${categorySlug(p.category)}">${xmlEscape(p.category)}</a><span class="sep">/</span>
     <span class="current">${xmlEscape(p.title)}</span>`;
 
   const ssrContent = `
@@ -504,7 +488,7 @@ app.get('/product.html', async (req, res) => {
       <p>${stripHtml(p.description) ? xmlEscape(stripHtml(p.description)) : ''}</p>
     </div>`;
 
-  let html = productPageTemplate
+  return productPageTemplate
     .replace('<title>Product — Natrio Organics</title>', `<title>${xmlEscape(p.title)} — Natrio Organics</title>`)
     .replace(
       '<meta name="description" id="metaDescription" content="Shop pure, cold-pressed oils from Natrio Organics.">',
@@ -542,8 +526,36 @@ app.get('/product.html', async (req, res) => {
       '<div class="pd-layout" id="pd">Loading…</div>',
       `<div class="pd-layout" id="pd">${ssrContent}</div>`
     );
+}
 
+// Clean canonical URL — no query string, so it's fully followable/indexable.
+app.get('/product/:id', async (req, res) => {
+  const html = await renderProductPage(req.params.id);
   res.send(html);
+});
+
+const productsPageTemplate = fs.readFileSync(path.join(__dirname, 'public', 'products.html'), 'utf-8');
+
+// Same treatment for category pages: /products/hair-oils instead of
+// /products.html?category=Hair%20Oils. The underlying products.html page
+// is still fully client-rendered (fetches and filters product data in the
+// browser), so this route just serves that same file — the category slug
+// in the URL is picked up by client-side JS below.
+app.get('/products/:slug', async (req, res) => {
+  res.send(productsPageTemplate);
+});
+
+app.get('/products.html', async (req, res) => {
+  if (req.query.category) return res.redirect(301, `/products/${categorySlug(req.query.category)}`);
+  res.send(productsPageTemplate);
+});
+
+// Old query-string URL redirects into the clean one, so nothing that
+// already links to /product.html?id=... breaks — but our own site never
+// links to this form anymore, only the clean version above.
+app.get('/product.html', async (req, res) => {
+  if (req.query.id) return res.redirect(301, `/product/${encodeURIComponent(req.query.id)}`);
+  res.send(productPageTemplate);
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -1438,7 +1450,7 @@ app.post('/api/admin/categories', requireAdmin, async (req, res) => {
   const categories = await readJSON(CATEGORIES_FILE);
   const category = {
     title,
-    url: `/products.html?category=${encodeURIComponent(title)}`,
+    url: `/products/${categorySlug(title)}`,
     image: image || ''
   };
   categories.push(category);
@@ -1453,7 +1465,7 @@ app.put('/api/admin/categories/:index', requireAdmin, async (req, res) => {
   const { title, image } = req.body;
   categories[idx] = {
     title: title || categories[idx].title,
-    url: `/products.html?category=${encodeURIComponent(title || categories[idx].title)}`,
+    url: `/products/${categorySlug(title || categories[idx].title)}`,
     image: image !== undefined ? image : categories[idx].image
   };
   await writeJSON(CATEGORIES_FILE, categories);

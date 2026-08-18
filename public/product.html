@@ -141,7 +141,15 @@
 
   <script src="/script.js"></script>
   <script>
-    const id = new URLSearchParams(location.search).get('id');
+    function categorySlugClient(str) {
+      return String(str || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    }
+
+    // Reads the clean URL first (/product/olive-hair-oil), falling back to
+    // the old ?id= query-string form for anything that might still link
+    // to it (e.g. an old bookmark or cached page).
+    const pathMatch = location.pathname.match(/^\/product\/([^/]+)/);
+    const id = pathMatch ? decodeURIComponent(pathMatch[1]) : new URLSearchParams(location.search).get('id');
     let currentProduct = null;
 
     fetch(`/api/products/${id}`).then(r => r.json()).then(p => {
@@ -160,7 +168,7 @@
 
       // ---- SEO: title, meta tags, canonical, and Product structured data ----
       const shortDesc = (p.description || '').replace(/<[^>]+>/g, '').slice(0, 155);
-      const pageUrl = `https://natrio.pk/product.html?id=${p.id}`;
+      const pageUrl = `https://natrio.pk/product/${p.id}`;
       const imgUrl = p.image ? `https://natrio.pk${p.image}` : 'https://natrio.pk/images/logo.png';
 
       document.title = `${p.title} — Natrio Organics`;
@@ -196,7 +204,7 @@
       // breadcrumb
       document.getElementById('breadcrumb').innerHTML = `
         <a href="/">Home</a><span class="sep">/</span>
-        <a href="/products.html?category=${encodeURIComponent(p.category)}">${p.category}</a><span class="sep">/</span>
+        <a href="/products/${categorySlugClient(p.category)}">${p.category}</a><span class="sep">/</span>
         <span class="current">${p.title}</span>
       `;
 
@@ -394,7 +402,7 @@
         const related = list.filter(rp => rp.id !== p.id);
         document.getElementById('relatedSlider').innerHTML = related.map(rp => `
           <div class="product-card">
-            <a href="/product.html?id=${rp.id}">
+            <a href="/product/${rp.id}">
               <div class="thumb">
                 ${rp.image
                   ? `<img class="img-main" src="${rp.image}" alt="${rp.title}" onerror="this.parentElement.innerHTML='<span class=placeholder>${rp.title}</span>'">${rp.hoverImage ? `<img class="img-alt" src="${rp.hoverImage}" alt="" onerror="this.remove()">` : ''}`
@@ -403,7 +411,7 @@
             </a>
             <div class="body">
               <span class="category ${rp.category === 'Facial Care' ? 'rose' : ''}">${rp.category}</span>
-              <h3><a href="/product.html?id=${rp.id}">${rp.title}</a></h3>
+              <h3><a href="/product/${rp.id}">${rp.title}</a></h3>
               <div class="price">${money(rp.price)}</div>
               <button class="add-btn" onclick="addToCart('${rp.id}','${(rp.variants[0] && rp.variants[0].name) || rp.variants[0]}',1).then(()=>this.textContent='Added ✓')">Add to Cart</button>
             </div>

@@ -754,3 +754,20 @@ These fixes were verified against the real content in your database (not
 sample data) before shipping — word count, H1 count, heading level
 presence, internal link count, and whether the page title's key words
 actually appear in the visible content were all checked directly.
+
+## 28. Clean URLs (no query-string parameters)
+
+Product and category pages now use clean paths instead of query strings:
+
+- `/product/olive-hair-oil` instead of `/product.html?id=olive-hair-oil`
+- `/products/hair-oils` instead of `/products.html?category=Hair%20Oils`
+
+Every internal link across the site (navigation, footer, homepage,
+sitemap, product feed, breadcrumbs) now points to these clean URLs
+directly. The old query-string URLs still work — they 301-redirect into
+the clean version — so nothing that's already indexed or bookmarked
+breaks, but the site itself never links to that form anymore.
+
+Category slugs are generated automatically from the category title (e.g.
+"Facial Care" → `facial-care`), so adding a new category in
+`/admin.html` → Categories just works, no manual slug entry needed.

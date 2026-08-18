@@ -11,8 +11,8 @@ function renderHeader() {
           <img src="/images/logo.png" alt="Natrio Organics" class="logo-img">
         </a>
         <nav class="main-nav" id="mainNav">
-          <a href="/products.html?category=Hair%20Oils">Hair Oils</a>
-          <a href="/products.html?category=Facial%20Care">Facial Care</a>
+          <a href="/products/hair-oils">Hair Oils</a>
+          <a href="/products/facial-care">Facial Care</a>
           <a href="/products.html">All Products</a>
           <a href="/account.html" id="mobileAccountLink" class="mobile-only-link">My Account</a>
         </nav>
@@ -111,8 +111,8 @@ function renderFooter() {
         <div>
           <h3>Shop</h3>
           <ul>
-            <li><a href="/products.html?category=Hair%20Oils">Hair Oils</a></li>
-            <li><a href="/products.html?category=Facial%20Care">Facial Care</a></li>
+            <li><a href="/products/hair-oils">Hair Oils</a></li>
+            <li><a href="/products/facial-care">Facial Care</a></li>
             <li><a href="/products.html">All Products</a></li>
           </ul>
         </div>
