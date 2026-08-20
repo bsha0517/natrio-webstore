@@ -771,3 +771,50 @@ breaks, but the site itself never links to that form anymore.
 Category slugs are generated automatically from the category title (e.g.
 "Facial Care" → `facial-care`), so adding a new category in
 `/admin.html` → Categories just works, no manual slug entry needed.
+
+## 29. Automatic image compression on upload
+
+Every image uploaded through the admin panel (product photos, category
+images, hero slides, blog images, Instagram posts) or through checkout
+(payment proof screenshots) is now automatically compressed before it's
+stored — no extra step, nothing to remember to do.
+
+**What happens on upload:**
+- Resized so its longest side is no more than 1600px (larger than the
+  site ever actually displays an image, so there's still headroom for
+  retina/high-DPI screens) — but never enlarged if the original was
+  already smaller.
+- Converted to WebP, a modern format that's substantially smaller than
+  JPEG or PNG at equivalent visual quality, and still supports
+  transparency (so logos and icons with transparent backgrounds still
+  work correctly).
+- Tested against a real image from this project before shipping: a
+  1.34MB PNG logo compressed down to 110KB — a 92% reduction — with the
+  result verified as a valid, correctly-sized image afterward, not just
+  assumed to work.
+- If compression fails for any reason (a corrupt file, an unsupported
+  format), the original file is stored as-is rather than the upload
+  failing outright.
+
+**What this doesn't cover:** images already uploaded before this change
+went live stay as they were — this only affects new uploads going
+forward. If your homepage still feels slow after this update, the
+existing hero/product images already in your database are the likely
+cause; re-uploading them through the same admin fields will compress them
+retroactively. Images that live in `public/images/` and were added by
+committing files directly to GitHub (rather than through the admin
+upload button) also aren't touched by this — those should be compressed
+before committing, or uploaded through the admin panel instead so they
+go through this same pipeline.
+
+**To compress everything already uploaded before this feature existed:**
+`/admin.html` → Settings → **Compress Existing Images** → click
+"Recompress All Existing Images." This goes through every image already
+in the database and compresses whichever ones haven't been already,
+showing you a summary of how much space it saved when it's done. Safe to
+run more than once — it automatically detects and skips anything already
+compressed, so re-running it can't accidentally degrade an image through
+repeated lossy re-encoding. Tested against a realistic mix of an
+uncompressed image, an already-compressed one, and a tiny image before
+shipping, to confirm each case is handled correctly (compress, skip as
+already-done, and skip if compression wouldn't actually help).

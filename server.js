@@ -5,6 +5,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { MongoClient } = require('mongodb');
 const multer = require('multer');
+const sharp = require('sharp');
 const { v4: uuidv4 } = require('uuid');
 const emailTemplates = require('./email-templates');
 
@@ -1155,17 +1156,41 @@ const upload = multer({
   }
 });
 
+// Compresses and resizes any uploaded image before it's stored, so pages
+// aren't shipping full-resolution phone-camera photos to every visitor.
+// Converts to WebP (much smaller than JPEG/PNG at equivalent quality, and
+// still supports transparency for things like logos), caps the longest
+// side at 1600px (larger than any size the site actually displays, so
+// there's still headroom for retina screens), and never enlarges a
+// smaller image. Falls back to the original file untouched if processing
+// fails for any reason (corrupt upload, unsupported format) — a slightly
+// heavier image is much better than a broken upload.
+async function compressImage(buffer, originalMimetype) {
+  try {
+    const compressed = await sharp(buffer)
+      .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toBuffer();
+    return { data: compressed, contentType: 'image/webp' };
+  } catch (err) {
+    console.error('Image compression failed, storing original:', err.message);
+    return { data: buffer, contentType: originalMimetype };
+  }
+}
+
 app.post('/api/admin/upload', requireAdmin, (req, res) => {
   upload.single('image')(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: 'No file was uploaded' });
 
+    const { data, contentType } = await compressImage(req.file.buffer, req.file.mimetype);
+
     const id = uuidv4();
     await db.collection('uploads').insertOne({
       _id: id,
-      contentType: req.file.mimetype,
+      contentType,
       filename: req.file.originalname,
-      data: req.file.buffer,
+      data,
       uploadedAt: new Date().toISOString()
     });
 
@@ -1182,12 +1207,14 @@ app.post('/api/checkout/upload-payment-proof', (req, res) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: 'No file was uploaded' });
 
+    const { data, contentType } = await compressImage(req.file.buffer, req.file.mimetype);
+
     const id = uuidv4();
     await db.collection('uploads').insertOne({
       _id: id,
-      contentType: req.file.mimetype,
+      contentType,
       filename: req.file.originalname,
-      data: req.file.buffer,
+      data,
       uploadedAt: new Date().toISOString(),
       isPaymentProof: true
     });
@@ -1202,6 +1229,62 @@ app.get('/uploads/:id', async (req, res) => {
   res.set('Content-Type', doc.contentType);
   res.set('Cache-Control', 'public, max-age=31536000, immutable');
   res.send(doc.data.buffer ? Buffer.from(doc.data.buffer) : doc.data);
+});
+
+// One-time (but safe to re-run) tool to compress everything already
+// uploaded before automatic compression existed. Skips anything already
+// in WebP format so re-running this doesn't repeatedly re-encode the same
+// image and slowly degrade it — WebP is only produced by compressImage(),
+// so a doc already in that format has already been through this once.
+// Only keeps the compressed version if it's actually smaller, so a
+// handful of already-tiny images can't accidentally get bigger.
+app.post('/api/admin/recompress-uploads', requireAdmin, async (req, res) => {
+  const docs = await db.collection('uploads').find({}).toArray();
+
+  let compressedCount = 0;
+  let skippedAlready = 0;
+  let skippedNoBenefit = 0;
+  let errors = 0;
+  let totalOriginalBytes = 0;
+  let totalNewBytes = 0;
+
+  for (const doc of docs) {
+    if (doc.contentType === 'image/webp') {
+      skippedAlready++;
+      continue;
+    }
+    try {
+      const originalBuffer = doc.data.buffer ? Buffer.from(doc.data.buffer) : doc.data;
+      const { data, contentType } = await compressImage(originalBuffer, doc.contentType);
+
+      if (data.length < originalBuffer.length) {
+        await db.collection('uploads').updateOne(
+          { _id: doc._id },
+          { $set: { data, contentType, compressedAt: new Date().toISOString() } }
+        );
+        compressedCount++;
+        totalOriginalBytes += originalBuffer.length;
+        totalNewBytes += data.length;
+      } else {
+        skippedNoBenefit++;
+      }
+    } catch (err) {
+      console.error(`Failed to recompress upload ${doc._id}:`, err.message);
+      errors++;
+    }
+  }
+
+  res.json({
+    success: true,
+    total: docs.length,
+    compressedCount,
+    skippedAlready,
+    skippedNoBenefit,
+    errors,
+    totalOriginalBytes,
+    totalNewBytes,
+    savedBytes: totalOriginalBytes - totalNewBytes
+  });
 });
 
 app.post('/api/admin/login', async (req, res) => {
