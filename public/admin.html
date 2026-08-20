@@ -219,28 +219,28 @@
             <label>Main image path</label>
             <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: square, 1000×1000px. Shown everywhere — cards, homepage, product page.</p>
             <input id="prodImage" placeholder="/images/olive-hair-oil.jpg">
-            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'prodImage')" style="margin-top:6px;font-size:12px;">
+            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'prodImage', document.getElementById('prodTitle').value)" style="margin-top:6px;font-size:12px;">
             <span id="prodImage_status" style="font-size:12px;"></span>
           </div>
           <div>
             <label>Hover image path (optional)</label>
             <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: square, 1000×1000px. Swaps in on mouse-over on product cards.</p>
             <input id="prodHoverImage" placeholder="/images/olive-hair-oil-alt.jpg">
-            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'prodHoverImage')" style="margin-top:6px;font-size:12px;">
+            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'prodHoverImage', document.getElementById('prodTitle').value)" style="margin-top:6px;font-size:12px;">
             <span id="prodHoverImage_status" style="font-size:12px;"></span>
           </div>
           <div>
             <label>3rd image path (optional)</label>
             <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: square, 1000×1000px. Only appears in the product page gallery.</p>
             <input id="prodImage3" placeholder="/images/olive-hair-oil-3.jpg">
-            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'prodImage3')" style="margin-top:6px;font-size:12px;">
+            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'prodImage3', document.getElementById('prodTitle').value)" style="margin-top:6px;font-size:12px;">
             <span id="prodImage3_status" style="font-size:12px;"></span>
           </div>
           <div>
             <label>4th image path (optional)</label>
             <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: square, 1000×1000px. Only appears in the product page gallery.</p>
             <input id="prodImage4" placeholder="/images/olive-hair-oil-4.jpg">
-            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'prodImage4')" style="margin-top:6px;font-size:12px;">
+            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'prodImage4', document.getElementById('prodTitle').value)" style="margin-top:6px;font-size:12px;">
             <span id="prodImage4_status" style="font-size:12px;"></span>
           </div>
           <div class="full">
@@ -504,7 +504,7 @@
             <label>Image path</label>
             <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: landscape, 1200×675px (16:9)</p>
             <input id="blogImage" placeholder="/images/blog-dandruff.jpg">
-            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'blogImage')" style="margin-top:6px;font-size:12px;">
+            <input type="file" accept="image/*" onchange="handleImageUpload(this, 'blogImage', document.getElementById('blogTitle').value)" style="margin-top:6px;font-size:12px;">
             <span id="blogImage_status" style="font-size:12px;"></span>
           </div>
           <div class="full">
@@ -548,12 +548,13 @@
     // via /api/admin/upload, then fills in the given text input with the
     // returned URL and fires a change event so any existing onchange
     // handler on that field (e.g. updateCategoryField) still runs.
-    async function handleImageUpload(fileInput, targetInputId) {
+    async function handleImageUpload(fileInput, targetInputId, label) {
       const file = fileInput.files[0];
       if (!file) return;
       const statusEl = document.getElementById(targetInputId + '_status');
       const formData = new FormData();
       formData.append('image', file);
+      if (label) formData.append('label', label);
       try {
         if (statusEl) { statusEl.style.color = 'var(--muted)'; statusEl.textContent = 'Uploading…'; }
         const res = await fetch('/api/admin/upload', { method: 'POST', body: formData });
@@ -1002,7 +1003,7 @@
               <label>Image path</label>
               <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: square, 800×800px</p>
               <input id="catImage${i}" value="${c.image || ''}" onchange="updateCategoryField(${i},'image',this.value)" placeholder="/images/category-x.jpg">
-              <input type="file" accept="image/*" onchange="handleImageUpload(this, 'catImage${i}')" style="margin-top:6px;font-size:12px;">
+              <input type="file" accept="image/*" onchange="handleImageUpload(this, 'catImage${i}', document.getElementById('catImage${i}').closest('.form-grid').querySelector('input').value || '${c.title}')" style="margin-top:6px;font-size:12px;">
               <span id="catImage${i}_status" style="font-size:12px;"></span>
             </div>
           </div>
@@ -1227,7 +1228,7 @@
               <label>Image path</label>
               <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: portrait, 1080×1440px (3:4 ratio, matches Instagram's standard post crop)</p>
               <input id="instaImage${i}" value="${p.image || ''}" onchange="updateInstagramField(${i},'image',this.value)" placeholder="/images/insta-1.jpg">
-              <input type="file" accept="image/*" onchange="handleImageUpload(this, 'instaImage${i}')" style="margin-top:6px;font-size:12px;">
+              <input type="file" accept="image/*" onchange="handleImageUpload(this, 'instaImage${i}', 'instagram-post')" style="margin-top:6px;font-size:12px;">
               <span id="instaImage${i}_status" style="font-size:12px;"></span>
             </div>
             <div>
@@ -1699,7 +1700,7 @@
               <label>Image path</label>
               <p style="font-size:11px;color:var(--muted);margin:0 0 6px;">Recommended: wide banner, around 1920×650px. The picture is never cropped — it always shows in full, so keep this roughly the same shape for a consistent look across slides.</p>
               <input id="heroImage${i}" value="${s.image || ''}" onchange="updateHeroField(${i},'image',this.value)" placeholder="/images/hero-1.jpg">
-              <input type="file" accept="image/*" onchange="handleImageUpload(this, 'heroImage${i}')" style="margin-top:6px;font-size:12px;">
+              <input type="file" accept="image/*" onchange="handleImageUpload(this, 'heroImage${i}', 'hero-slide')" style="margin-top:6px;font-size:12px;">
               <span id="heroImage${i}_status" style="font-size:12px;"></span>
             </div>
             <div>

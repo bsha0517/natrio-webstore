@@ -818,3 +818,54 @@ repeated lossy re-encoding. Tested against a realistic mix of an
 uncompressed image, an already-compressed one, and a tiny image before
 shipping, to confirm each case is handled correctly (compress, skip as
 already-done, and skip if compression wouldn't actually help).
+
+## 30. Fixing broken images flagged in Google Search Console
+
+If Search Console shows a page's resources "couldn't be loaded" for a
+bunch of `/images/...jpg` files, this almost always means one thing:
+**those product/category/hero images were never actually uploaded** —
+they're still pointing at placeholder file paths from before the site had
+real photos, and those files genuinely don't exist. This isn't a hosting
+or crawler problem; Google is correctly reporting a real 404.
+
+**The fix is manual and can only happen through you:** go to
+`/admin.html` and, for every product, category, and the hero slide, use
+the **Upload** button under each image field to pick a real photo from
+your computer. As soon as you do, the placeholder path gets replaced with
+a working one automatically (and compressed automatically too, per
+section 29). The same applies to any blog post whose image field still
+literally says something like `/images/blog-dandruff.jpg` — that's the
+grey example text from the form, not a real value; it needs a real
+upload the same way.
+
+**A broken-image-heavy homepage can also suppress how much of your site
+Google bothers crawling next** — so if you've noticed very few pages
+indexed so far, fixing these is likely the single highest-leverage thing
+you can do. After uploading real photos everywhere, use Search
+Console's URL Inspection tool → "Request Indexing" on your homepage to
+prompt a fresh crawl, rather than waiting for Google's next scheduled
+visit.
+
+**Your logo specifically was fixed already** — it was a real file, just
+1.34MB uncompressed (added directly via GitHub rather than the admin
+upload button, so it never went through automatic compression). It's now
+37KB, verified as a valid image at the correct dimensions, same file
+path — nothing else needed updating.
+
+## 31. Descriptive image filenames (image SEO)
+
+Images uploaded through the admin panel now get a filename based on
+their title, instead of a bare random ID — e.g.
+`/uploads/olive-hair-oil-a1b2c3d4` instead of `/uploads/a1b2c3d4e5f6...`.
+This is a minor but real image-SEO signal (Google does weigh descriptive
+filenames somewhat for Image Search). Applies automatically to product
+photos (named from the product title) and blog images (named from the
+post title); Instagram and hero images use a generic label since they
+don't have as natural a title field to draw from. This only affects new
+uploads — existing images keep their current URLs (changing them would
+break whatever's already linking to them).
+
+**Alt text** was already in good shape from earlier work — every product,
+blog, and category image already pulls its real title dynamically rather
+than using generic or missing alt text, verified again while working on
+this.

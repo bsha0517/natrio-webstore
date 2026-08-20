@@ -1185,7 +1185,16 @@ app.post('/api/admin/upload', requireAdmin, (req, res) => {
 
     const { data, contentType } = await compressImage(req.file.buffer, req.file.mimetype);
 
-    const id = uuidv4();
+    // Descriptive filenames help image SEO a little (Google does weigh
+    // this, lightly, for Image Search) — if the admin form sent a label
+    // (e.g. the product's title), use it to build a readable URL like
+    // /uploads/olive-hair-oil-a1b2c3d4 instead of a bare random ID.
+    const label = (req.body.label || '').toString().trim();
+    const slug = label
+      ? label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 60)
+      : '';
+    const id = slug ? `${slug}-${uuidv4().slice(0, 8)}` : uuidv4();
+
     await db.collection('uploads').insertOne({
       _id: id,
       contentType,
