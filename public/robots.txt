@@ -7,6 +7,6 @@ Disallow: /checkout.html
 Disallow: /order-confirmation.html
 Disallow: /login.html
 Disallow: /signup.html
-Disallow: /api/
+Disallow: /api/admin/
 
 Sitemap: https://natrio.pk/sitemap.xml

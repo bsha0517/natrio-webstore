@@ -869,3 +869,21 @@ break whatever's already linking to them).
 blog, and category image already pulls its real title dynamically rather
 than using generic or missing alt text, verified again while working on
 this.
+
+## 32. robots.txt was blocking Googlebot from rendering pages correctly
+
+`robots.txt` previously blocked all of `/api/` from Googlebot. That was
+overcautious and actively counterproductive: several pages
+(`products.html`, `cart.html`, `blog.html`, and the interactive version of
+the homepage/product pages) load their real content by calling these
+`/api/...` endpoints in the browser. When Google renders a page, it runs
+the page's JavaScript just like a real browser — but if it's blocked from
+fetching the data that JavaScript needs, it sees a broken or empty page,
+undermining the content/SEO fixes made elsewhere in this project. JSON API
+responses were never at risk of showing up as search results either way,
+so there was no upside to blocking them, only downside.
+
+Fixed to only block the admin-only API routes (`/api/admin/...`, already
+protected server-side regardless — this is just tidiness) while every
+public data endpoint your pages actually depend on to render is now
+crawlable.
