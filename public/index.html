@@ -147,6 +147,17 @@
       return String(str || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     }
 
+    // A homepage fetch occasionally hitting the server mid-restart (or a
+    // brief database reconnect) can come back with an empty body — safe to
+    // just skip that one section for this page load rather than throw an
+    // uncaught error. Returns an empty array on any failure so callers can
+    // treat "no data" and "request failed" the same way.
+    function safeFetchJSON(url) {
+      return fetch(url)
+        .then(r => r.ok ? r.json() : [])
+        .catch(err => { console.error(`Failed to load ${url}:`, err.message); return []; });
+    }
+
     function productCard(p) {
       const hover = p.hoverImage ? `<img class="img-alt" src="${p.hoverImage}" alt="" onerror="this.remove()">` : '';
       return `
@@ -168,13 +179,13 @@
     }
 
     // Bestsellers
-    fetch('/api/products').then(r => r.json()).then(list => {
+    safeFetchJSON('/api/products').then(list => {
       const best = list.filter(p => p.bestseller);
       document.getElementById('bestsellerSlider').innerHTML = (best.length ? best : list).map(productCard).join('');
     });
 
     // Categories
-    fetch('/api/categories').then(r => r.json()).then(list => {
+    safeFetchJSON('/api/categories').then(list => {
       document.getElementById('categoryStrip').innerHTML = list.map(c => `
         <a class="category-tile" href="/products/${slugify(c.title)}">
           <div class="cat-thumb" style="background-image:url('${c.image}')"></div>
@@ -184,7 +195,7 @@
     });
 
     // Blog
-    fetch('/api/blog').then(r => r.json()).then(list => {
+    safeFetchJSON('/api/blog').then(list => {
       const slider = document.getElementById('blogSlider');
       if (!list.length) {
         slider.closest('section').style.display = 'none';
@@ -206,7 +217,7 @@
     });
 
     // Instagram strip — pulls real posts you've added in /admin.html → Instagram tab
-    fetch('/api/instagram').then(r => r.json()).then(posts => {
+    safeFetchJSON('/api/instagram').then(posts => {
       const strip = document.getElementById('instaStrip');
       if (!posts.length) {
         strip.closest('section').style.display = 'none';
@@ -219,7 +230,7 @@
 
     // Hero slider (max 3 slides)
     let heroIndex = 0, heroTimer;
-    fetch('/api/hero').then(r => r.json()).then(slides => {
+    safeFetchJSON('/api/hero').then(slides => {
       slides = slides.slice(0, 3);
       const slidesEl = document.getElementById('heroSlides');
       const dotsEl = document.getElementById('heroDots');
