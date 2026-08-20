@@ -364,22 +364,30 @@ app.get('/', async (req, res) => {
   ]);
 
   const hero = heroSlides[0] || {};
-  const heroHeading = hero.heading || 'Pure Cold-Pressed Oils, Made in Pakistan';
-  const heroEyebrow = hero.eyebrow || 'Cold Pressed · Chemical Free';
-  const heroSubtext = hero.subtext || 'Nourish your hair and skin naturally with oils sourced, pressed, and bottled with care.';
-  const heroButtonText = hero.buttonText || 'Shop Now';
+  const heroHeading = hero.heading || '';
+  const heroEyebrow = hero.eyebrow || '';
+  const heroSubtext = hero.subtext || '';
+  const heroButtonText = hero.buttonText || '';
   const heroButtonUrl = hero.buttonUrl || '/products.html';
+  // Only shows the dark text overlay if you've actually set at least one
+  // field in /admin.html → Hero Slider — a photo-only slide stays
+  // photo-only, exactly as chosen, no fallback marketing text forced on top.
+  const hasHeroText = heroHeading || heroEyebrow || heroSubtext || heroButtonText;
 
   const ssrHero = `
     <div class="hero-slide active" data-index="0">
-      ${hero.image ? `<div class="hero-bg" style="background-image:url('${xmlEscape(hero.image)}')"></div>` : ''}
-      <div class="hero-inner">
-        <span class="eyebrow">${xmlEscape(heroEyebrow)}</span>
-        <h1>${xmlEscape(heroHeading)}</h1>
-        <p>${xmlEscape(heroSubtext)}</p>
-        <a href="${xmlEscape(heroButtonUrl)}" class="btn btn-primary">${xmlEscape(heroButtonText)}</a>
-      </div>
-    </div>`;
+      <img class="hero-slide-img" src="${xmlEscape(hero.image || '')}" alt="${xmlEscape(heroHeading || 'Natrio Organics')}">
+      ${hasHeroText ? `
+      <div class="hero-slide-text">
+        <div class="hero-inner">
+          ${heroEyebrow ? `<span class="eyebrow">${xmlEscape(heroEyebrow)}</span>` : ''}
+          ${heroHeading ? `<h1>${xmlEscape(heroHeading)}</h1>` : ''}
+          ${heroSubtext ? `<p>${xmlEscape(heroSubtext)}</p>` : ''}
+          ${heroButtonText ? `<a href="${xmlEscape(heroButtonUrl)}" class="btn btn-primary">${xmlEscape(heroButtonText)}</a>` : ''}
+        </div>
+      </div>` : ''}
+    </div>
+    ${!heroHeading ? `<h1 class="sr-only">Natrio Organics — Pure Cold-Pressed Oils in Pakistan</h1>` : ''}`;
 
   const ssrCategories = categories.map(c => `
     <a class="category-tile" href="/products/${categorySlug(c.title)}">

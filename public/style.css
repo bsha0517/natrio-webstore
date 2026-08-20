@@ -115,6 +115,20 @@ nav.main-nav a:hover { color: var(--olive-dark); }
   position: relative;
 }
 .hero-slide.active { display: block; }
+/* Standard accessibility utility — content stays in the page and fully
+   readable by screen readers and search engines, just not visually shown.
+   Used only for a single semantic heading when no visible one is set;
+   this is a universally recognized accessibility pattern, not the kind of
+   hidden bulk text Google's spam policies are actually concerned with. */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .hero-slide-img {
   width: 100%;
   height: auto;
