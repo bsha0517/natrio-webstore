@@ -545,18 +545,87 @@ app.get('/product/:id', async (req, res) => {
 
 const productsPageTemplate = fs.readFileSync(path.join(__dirname, 'public', 'products.html'), 'utf-8');
 
+function ssrProductCard(p) {
+  const variants = normalizeVariants(p);
+  return `
+        <div class="product-card">
+          <a href="/product/${encodeURIComponent(p.id)}">
+            <div class="thumb">
+              ${p.image ? `<img src="${xmlEscape(p.image)}" alt="${xmlEscape(p.title)}">` : `<span class="placeholder">${xmlEscape(p.title)}</span>`}
+            </div>
+          </a>
+          <div class="body">
+            <span class="category ${p.category === 'Facial Care' ? 'rose' : ''}">${xmlEscape(p.category || '')}</span>
+            <h3><a href="/product/${encodeURIComponent(p.id)}">${xmlEscape(p.title)}</a></h3>
+            <div class="price">Rs. ${variants[0].price.toLocaleString()}</div>
+          </div>
+        </div>`;
+}
+
+async function renderProductsPage(categoryTitle) {
+  const products = await readJSON(PRODUCTS_FILE);
+  const filtered = categoryTitle ? products.filter(p => p.category === categoryTitle) : products;
+
+  const pageTitle = categoryTitle || 'All Products';
+  const pageUrl = categoryTitle ? `${SITE_URL}/products/${categorySlug(categoryTitle)}` : `${SITE_URL}/products.html`;
+  const description = categoryTitle
+    ? `Shop ${categoryTitle} from Natrio Organics — pure, cold-pressed, and made in Pakistan.`
+    : `Browse Natrio Organics' full range of pure, cold-pressed hair oils and facial care products. Nationwide delivery across Pakistan.`;
+
+  const ssrGrid = filtered.length
+    ? filtered.map(ssrProductCard).join('')
+    : `<div class="empty-state">No products found.</div>`;
+
+  return productsPageTemplate
+    .replace('<title>Shop All Products — Natrio Organics</title>', `<title>${xmlEscape(pageTitle)}${categoryTitle ? '' : ' — Shop All Products'} — Natrio Organics</title>`)
+    .replace(
+      "<meta name=\"description\" content=\"Browse Natrio Organics' full range of pure, cold-pressed hair oils and facial care products. Nationwide delivery across Pakistan.\">",
+      `<meta name="description" content="${xmlEscape(description)}">`
+    )
+    .replace(
+      '<link rel="canonical" href="https://natrio.pk/products.html">',
+      `<link rel="canonical" href="${pageUrl}">`
+    )
+    .replace(
+      '<meta property="og:title" content="Shop All Products — Natrio Organics">',
+      `<meta property="og:title" content="${xmlEscape(pageTitle)} — Natrio Organics">`
+    )
+    .replace(
+      "<meta property=\"og:description\" content=\"Browse Natrio Organics' full range of pure, cold-pressed hair oils and facial care products.\">",
+      `<meta property="og:description" content="${xmlEscape(description)}">`
+    )
+    .replace(
+      '<meta property="og:url" content="https://natrio.pk/products.html">',
+      `<meta property="og:url" content="${pageUrl}">`
+    )
+    .replace(
+      '<h1 id="pageTitle">All Products</h1>',
+      `<h1 id="pageTitle">${xmlEscape(pageTitle)}</h1>`
+    )
+    .replace(
+      '<div class="product-grid" id="grid"></div>',
+      `<div class="product-grid" id="grid">${ssrGrid}</div>`
+    );
+}
+
 // Same treatment for category pages: /products/hair-oils instead of
-// /products.html?category=Hair%20Oils. The underlying products.html page
-// is still fully client-rendered (fetches and filters product data in the
-// browser), so this route just serves that same file — the category slug
-// in the URL is picked up by client-side JS below.
+// /products.html?category=Hair%20Oils. Real product cards with real
+// working links now render directly in the response — the client-side
+// script still runs afterward and replaces the same grid with an
+// equivalent version (needed so switching categories via the URL bar,
+// or re-filtering, keeps working), but the initial page a crawler sees
+// already has genuine, followable product links, not just JS-only ones.
 app.get('/products/:slug', async (req, res) => {
-  res.send(productsPageTemplate);
+  const categories = await readJSON(CATEGORIES_FILE);
+  const match = categories.find(c => categorySlug(c.title) === req.params.slug);
+  const html = await renderProductsPage(match ? match.title : null);
+  res.send(html);
 });
 
 app.get('/products.html', async (req, res) => {
   if (req.query.category) return res.redirect(301, `/products/${categorySlug(req.query.category)}`);
-  res.send(productsPageTemplate);
+  const html = await renderProductsPage(null);
+  res.send(html);
 });
 
 // Old query-string URL redirects into the clean one, so nothing that

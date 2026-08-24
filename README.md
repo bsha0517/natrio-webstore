@@ -887,3 +887,25 @@ Fixed to only block the admin-only API routes (`/api/admin/...`, already
 protected server-side regardless — this is just tidiness) while every
 public data endpoint your pages actually depend on to render is now
 crawlable.
+
+## 33. Shop page (products.html) is now server-rendered too
+
+Same treatment as the homepage and product pages, applied to the "All
+Products" / category listing page. Previously, every product card
+(including its link) only existed inside client-side JavaScript template
+literals — real, working code for actual visitors, but it meant Google's
+simpler crawling heuristics could occasionally mistake the literal
+`${p.id}` text in the raw JavaScript source for a broken URL to try
+(showing up in Search Console as "discovered, not indexed" for nonsense
+URLs like `/product/${p.id}`). Real product cards with real, working
+links now render directly in the page's initial HTML — verified against
+every real product in the database, both for the all-products view and
+filtered by category, before shipping.
+
+**On the broader list of "discovered, not indexed" URLs:** if you see a
+mix of `/uploads/...` image links and `/api/...` JSON endpoints in there
+too, those aren't actually problems — images were never meant to be
+indexed as standalone pages (that's normal, expected), and the `/api/...`
+entries are very likely a lagging report from before the `robots.txt` fix
+in section 32, which should clear up as Google re-crawls with the
+corrected file.
