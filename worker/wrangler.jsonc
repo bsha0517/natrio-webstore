@@ -1,0 +1,45 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "natrio-store",
+  "main": "src/index.js",
+  "compatibility_date": "2025-09-01",
+  // nodejs_compat: needed by the mongodb driver (node:net/tls/dns), node:crypto
+  // scrypt for customer passwords, Buffer, and AsyncLocalStorage.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Everything in ../public is served as static files. run_worker_first sends
+  // every request through the Worker so the canonical-domain redirect, SSR
+  // pages and /api routes run first; anything unmatched falls through to
+  // env.ASSETS. html_handling "none" keeps /about-us.html etc. working as-is
+  // (the default would redirect them to /about-us and break existing links).
+  "assets": {
+    "directory": "../public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+
+  // Lets src/index.js `import` index.html / product.html / products.html as
+  // strings for server-side rendering (replaces fs.readFileSync).
+  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }],
+
+  // Replaces the two setInterval sweeps: abandoned carts every 15 minutes,
+  // review requests on the first run of each hour.
+  "triggers": { "crons": ["*/15 * * * *"] },
+
+  "vars": {
+    "SITE_URL": "https://natrio.pk"
+  },
+  // Secrets (set with `npx wrangler secret put NAME`, never committed):
+  //   MONGODB_URI, ADMIN_PASSWORD, BREVO_API_KEY, SENDER_EMAIL, CONTACT_EMAIL
+  // Optional: ABANDONED_CART_HOURS, REVIEW_REQUEST_DAYS, SENDER_NAME
+
+  // Uncomment at cutover time (after the zones are on Cloudflare DNS):
+  // "routes": [
+  //   { "pattern": "natrio.pk", "custom_domain": true },
+  //   { "pattern": "www.natrio.pk", "custom_domain": true }
+  // ],
+
+  "observability": { "enabled": true }
+}

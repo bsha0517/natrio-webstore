@@ -909,3 +909,39 @@ indexed as standalone pages (that's normal, expected), and the `/api/...`
 entries are very likely a lagging report from before the `robots.txt` fix
 in section 32, which should clear up as Google re-crawls with the
 corrected file.
+
+## 34. Lazy-loading for non-critical images
+
+**On being indexed but not ranking well in search:** that's not a
+technical bug, and no code change fixes it directly — being indexed just
+means Google has the page; showing up for real search queries depends on
+domain authority, backlinks, and content depth built up over time (see
+section 27's off-page checklist — Google Business Profile, backlinks,
+being mentioned elsewhere online). A new site with a handful of pages
+often stays indexed-but-quiet for months regardless of how clean the code
+is underneath.
+
+**On real, existing images (payment icons, social icons, your logo, real
+uploaded product photos) failing to load in Search Console's resource
+check:** every image involved genuinely exists and works — this wasn't a
+missing-file problem like the earlier ones. The real cause: every image
+on the site loaded with equal priority, all at once, with no distinction
+between "this is the main photo the visitor needs to see immediately" and
+"this is a footer payment icon nobody's looking at yet." A single product
+page was asking the browser (and any tool testing it) to fetch the main
+photo, hover image, 2 extra images, several related-product thumbnails,
+and the footer's payment/social icons all simultaneously — enough
+simultaneous requests that some could plausibly time out in a tool with a
+limited testing budget, even though nothing was actually broken.
+
+Fixed by adding `loading="lazy"` to everything that isn't immediately
+visible when a page loads: footer logo, payment icons, social icons,
+hover-swap images, related-product thumbnails, homepage bestseller and
+blog card images, and the shop page's product grid. The browser now only
+fetches these once they're actually about to scroll into view, instead of
+fighting for bandwidth with the main image at page load. The genuinely
+critical images — your header logo, the product page's main photo, the
+homepage hero banner, and the small thumbnail selector next to the main
+product photo — were deliberately left eager, since lazy-loading
+above-the-fold content is counterproductive and can hurt how fast the
+page visually appears to load.

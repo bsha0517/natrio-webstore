@@ -110,6 +110,7 @@
   </div>
 
   <script src="/script.js"></script>
+  <script src="/image-compress.js"></script>
   <script>
     let cartSubtotal = 0;
     let shippingMethods = [];
@@ -263,15 +264,16 @@
     }
 
     document.getElementById('paymentProofInput').addEventListener('change', async function() {
-      const file = this.files[0];
-      if (!file) return;
+      const original = this.files[0];
+      if (!original) return;
       const status = document.getElementById('paymentProofStatus');
       status.style.color = 'var(--muted)';
       status.textContent = 'Uploading…';
 
-      const formData = new FormData();
-      formData.append('proof', file);
       try {
+        const file = window.compressImageFile ? await window.compressImageFile(original) : original;
+        const formData = new FormData();
+        formData.append('proof', file);
         const res = await fetch('/api/checkout/upload-payment-proof', { method: 'POST', body: formData });
         const data = await res.json();
         if (data.error) {

@@ -1,0 +1,7 @@
+# Copy to .dev.vars for `npm run dev` (never commit .dev.vars).
+# In production these are set with `npx wrangler secret put NAME`.
+MONGODB_URI=mongodb+srv://USER:PASS@cluster0.xxxxx.mongodb.net/natrio?retryWrites=true&w=majority
+ADMIN_PASSWORD=change-me
+BREVO_API_KEY=
+SENDER_EMAIL=info@natrio.pk
+CONTACT_EMAIL=info@natrio.pk

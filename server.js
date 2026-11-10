@@ -402,7 +402,7 @@ app.get('/', async (req, res) => {
     return `
     <div class="product-card">
       <a href="/product/${encodeURIComponent(p.id)}">
-        <div class="thumb">${p.image ? `<img src="${xmlEscape(p.image)}" alt="${xmlEscape(p.title)}">` : ''}</div>
+        <div class="thumb">${p.image ? `<img src="${xmlEscape(p.image)}" alt="${xmlEscape(p.title)}" loading="lazy">` : ''}</div>
       </a>
       <div class="body">
         <span class="category">${xmlEscape(p.category || '')}</span>
@@ -551,7 +551,7 @@ function ssrProductCard(p) {
         <div class="product-card">
           <a href="/product/${encodeURIComponent(p.id)}">
             <div class="thumb">
-              ${p.image ? `<img src="${xmlEscape(p.image)}" alt="${xmlEscape(p.title)}">` : `<span class="placeholder">${xmlEscape(p.title)}</span>`}
+              ${p.image ? `<img src="${xmlEscape(p.image)}" alt="${xmlEscape(p.title)}" loading="lazy">` : `<span class="placeholder">${xmlEscape(p.title)}</span>`}
             </div>
           </a>
           <div class="body">

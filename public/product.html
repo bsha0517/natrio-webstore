@@ -405,7 +405,7 @@
             <a href="/product/${rp.id}">
               <div class="thumb">
                 ${rp.image
-                  ? `<img class="img-main" src="${rp.image}" alt="${rp.title}" onerror="this.parentElement.innerHTML='<span class=placeholder>${rp.title}</span>'">${rp.hoverImage ? `<img class="img-alt" src="${rp.hoverImage}" alt="" onerror="this.remove()">` : ''}`
+                  ? `<img class="img-main" src="${rp.image}" alt="${rp.title}" loading="lazy" onerror="this.parentElement.innerHTML='<span class=placeholder>${rp.title}</span>'">${rp.hoverImage ? `<img class="img-alt" src="${rp.hoverImage}" alt="" loading="lazy" onerror="this.remove()">` : ''}`
                   : `<span class="placeholder">${rp.title}</span>`}
               </div>
             </a>

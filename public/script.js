@@ -95,16 +95,16 @@ function renderFooter() {
     <footer class="site-footer dark-footer">
       <div class="footer-grid">
         <div class="footer-contact">
-          <img src="/images/logo.png" alt="Natrio Organics" class="footer-logo">
+          <img src="/images/logo.png" alt="Natrio Organics" class="footer-logo" loading="lazy">
           <p>
             Natrio Organics is where pure, cold-pressed oils meet everyday natural care for healthier hair and glowing skin 🌿
           </p>
           <div class="social-row">
             <a href="https://www.facebook.com/share/18v6kUqF9a/" target="_blank" aria-label="Facebook">
-              <img src="/images/social/facebook.png" alt="Facebook">
+              <img src="/images/social/facebook.png" alt="Facebook" loading="lazy">
             </a>
             <a href="https://www.instagram.com/natrioorganics" target="_blank" aria-label="Instagram">
-              <img src="/images/social/instagram.png" alt="Instagram">
+              <img src="/images/social/instagram.png" alt="Instagram" loading="lazy">
             </a>
           </div>
         </div>
@@ -139,11 +139,11 @@ function renderFooter() {
       <div class="dark-footer-bottom">
         <span>&copy; ${new Date().getFullYear()} Natrio Organics. All rights reserved.</span>
         <div class="payment-icons">
-          <span class="payment-badge"><img src="/images/payments/cod.png" alt="Cash on Delivery"></span>
-          <span class="payment-badge"><img src="/images/payments/visa.png" alt="Visa"></span>
-          <span class="payment-badge"><img src="/images/payments/mastercard.png" alt="Mastercard"></span>
-          <span class="payment-badge"><img src="/images/payments/jazzcash.png" alt="JazzCash"></span>
-          <span class="payment-badge"><img src="/images/payments/easypaisa.png" alt="Easypaisa"></span>
+          <span class="payment-badge"><img src="/images/payments/cod.png" alt="Cash on Delivery" loading="lazy"></span>
+          <span class="payment-badge"><img src="/images/payments/visa.png" alt="Visa" loading="lazy"></span>
+          <span class="payment-badge"><img src="/images/payments/mastercard.png" alt="Mastercard" loading="lazy"></span>
+          <span class="payment-badge"><img src="/images/payments/jazzcash.png" alt="JazzCash" loading="lazy"></span>
+          <span class="payment-badge"><img src="/images/payments/easypaisa.png" alt="Easypaisa" loading="lazy"></span>
         </div>
       </div>
     </footer>

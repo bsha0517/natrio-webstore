@@ -540,6 +540,7 @@
     </div>
   </div>
 
+  <script src="/image-compress.js"></script>
   <script>
     function money(n) { return 'Rs. ' + Number(n).toLocaleString(); }
 
@@ -549,14 +550,16 @@
     // returned URL and fires a change event so any existing onchange
     // handler on that field (e.g. updateCategoryField) still runs.
     async function handleImageUpload(fileInput, targetInputId, label) {
-      const file = fileInput.files[0];
-      if (!file) return;
+      const original = fileInput.files[0];
+      if (!original) return;
       const statusEl = document.getElementById(targetInputId + '_status');
-      const formData = new FormData();
-      formData.append('image', file);
-      if (label) formData.append('label', label);
       try {
-        if (statusEl) { statusEl.style.color = 'var(--muted)'; statusEl.textContent = 'Uploading…'; }
+        if (statusEl) { statusEl.style.color = 'var(--muted)'; statusEl.textContent = 'Compressing…'; }
+        const file = window.compressImageFile ? await window.compressImageFile(original) : original;
+        const formData = new FormData();
+        formData.append('image', file);
+        if (label) formData.append('label', label);
+        if (statusEl) { statusEl.textContent = 'Uploading…'; }
         const res = await fetch('/api/admin/upload', { method: 'POST', body: formData });
         const data = await res.json();
         if (data.error) {
