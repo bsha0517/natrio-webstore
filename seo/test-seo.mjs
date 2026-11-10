@@ -223,7 +223,23 @@ async function main() {
   // ---------- 8. robots.txt ----------
   const robots = (await get('/robots.txt')).text;
   check('robots: declares sitemap', /^Sitemap:\s*https:\/\/natrio\.pk\/sitemap\.xml/m.test(robots));
-  check('robots: does not block site, /api/, /uploads/, /blog', !/^Disallow:\s*\/(\s|$|api\/?\s|uploads|blog)/m.test(robots));
+  // Only the groups that apply to Googlebot ("*" or "googlebot"). Cloudflare's
+  // managed robots.txt adds Disallow groups for AI-training bots, which is fine.
+  const googlebotRules = [];
+  let groupAgents = [], inRules = false;
+  for (const raw of robots.split(/\r?\n/)) {
+    const line = raw.replace(/#.*/, '').trim();
+    const m = /^([A-Za-z-]+)\s*:\s*(.*)$/.exec(line);
+    if (!m) continue;
+    const key = m[1].toLowerCase(), val = m[2].trim();
+    if (key === 'user-agent') { if (inRules) { groupAgents = []; inRules = false; } groupAgents.push(val.toLowerCase()); continue; }
+    if (key === 'allow' || key === 'disallow') {
+      inRules = true;
+      if (groupAgents.some(a => a === '*' || a === 'googlebot')) googlebotRules.push(`${key}:${val}`);
+    }
+  }
+  const blocked = googlebotRules.filter(r => /^disallow:\/(api\/?|uploads\/?|blog|product|products)?$/i.test(r) || r === 'disallow:/');
+  check('robots: Googlebot not blocked from site, /api/, /uploads/, /blog, products', blocked.length === 0, blocked.join(', '));
 
   // ---------- 9. Merchant feed ----------
   const feed = (await get('/product-feed.xml')).text;
