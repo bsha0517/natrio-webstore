@@ -21,7 +21,9 @@ Atlas network access must allow 0.0.0.0/0 (Render IPs change; the "SSL alert 80"
 - `public/` — static pages + `script.js` (header/footer, cart count, announcement bar, analytics/pixels, Customer Reviews badge, newsletter) + `style.css`.
 - `public/admin.html` — admin panel (tabs: Dashboard, Orders, Products, Categories, Shipping, Discounts, Instagram, Store Locations, Announcement Bar, Abandoned Carts, Settings, Hero Slider, Blog, Messages, Marketing).
 - `migrate-to-mongo.js` — one-off seed import.
-- `worker/` — Cloudflare Workers port (Hono, same Mongo data, same URLs; not yet live). Route changes must be made in BOTH `server.js` and `worker/src/index.js` until Render is retired. See `worker/README.md` for deploy/cutover. Uploads are compressed client-side by `public/image-compress.js` (no sharp on Workers).
+- `worker/` — **PRODUCTION** since 2026-11-10: Cloudflare Worker `natrio-store` (Hono) serving natrio.pk + www. All route changes go in `worker/src/index.js`; `server.js` is the retired Render/Express app (kept for history, not deployed). Header/footer markup lives in `worker/src/layout.js` (server-rendered; `script.js` only adds behaviour). Deploy = `cd worker && npx wrangler deploy` (manual; no CI). See `worker/README.md`. Uploads are compressed client-side by `public/image-compress.js` (no sharp on Workers).
+- `seo/` — `test-seo.mjs` regression suite (run against local `wrangler dev` seeded by `seed-local-from-prod.cjs`, or production with `READ_ONLY=1`), audit and implementation reports.
+- Blog articles are server-rendered at `/blog/<slug>` (old `/blog-post.html?slug=` 301s). Unknown products/categories/articles return real 404s (`public/404.html`). Bump `CACHE_VERSION` in worker/src/index.js whenever cached HTML changes shape.
 
 ## Key behaviours
 - SSR: server.js string-replaces placeholders in index/product/products HTML so crawlers see content; client JS then re-renders the same containers.

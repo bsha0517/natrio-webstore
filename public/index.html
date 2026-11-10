@@ -203,13 +203,13 @@
       }
       slider.innerHTML = list.slice(0, 4).map(b => `
         <div class="product-card">
-          <a href="/blog-post.html?slug=${b.slug}">
+          <a href="/blog/${encodeURIComponent(b.slug)}">
             <div class="thumb">${b.image ? `<img src="${b.image}" alt="${b.title}" loading="lazy" onerror="this.parentElement.style.background='var(--cream-deep)';this.remove()">` : ''}</div>
           </a>
           <div class="body">
-            <h3><a href="/blog-post.html?slug=${b.slug}">${b.title}</a></h3>
+            <h3><a href="/blog/${encodeURIComponent(b.slug)}">${b.title}</a></h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.6;">${b.excerpt || ''}</p>
-            <a class="read-more" href="/blog-post.html?slug=${b.slug}" style="font-size:13px;color:var(--olive);border-bottom:1px solid var(--olive);padding-bottom:2px;">Read more</a>
+            <a class="read-more" href="/blog/${encodeURIComponent(b.slug)}" style="font-size:13px;color:var(--olive);border-bottom:1px solid var(--olive);padding-bottom:2px;">Read more</a>
           </div>
         </div>
       `).join('');

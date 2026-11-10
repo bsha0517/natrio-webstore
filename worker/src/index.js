@@ -24,6 +24,10 @@ import emailTemplates from '../../email-templates.js';
 import homePageTemplate from '../../public/index.html';
 import productPageTemplate from '../../public/product.html';
 import productsPageTemplate from '../../public/products.html';
+import blogPostTemplate from '../../public/blog-post.html';
+import blogIndexTemplate from '../../public/blog.html';
+import notFoundTemplate from '../../public/404.html';
+import { applyLayout } from './layout.js';
 
 const app = new Hono();
 
@@ -127,6 +131,8 @@ const CACHEABLE_PATHS = [
   /^\/products\.html$/,
   /^\/sitemap\.xml$/,
   /^\/product-feed\.xml$/,
+  /^\/blog\.html$/,
+  /^\/blog\/[^/]+$/,
   /^\/api\/products(\/[^/]+)?$/,
   /^\/api\/blog(\/[^/]+)?$/,
   /^\/api\/(categories|hero|shipping|instagram|stores|announcements|settings)$/
@@ -137,6 +143,10 @@ const TRACKING_PARAMS = /^(utm_.*|fbclid|gclid|gbraid|wbraid|ttclid|msclkid|_ga)
 let refreshToken = null;
 const getRefreshToken = () => (refreshToken ||= crypto.randomUUID());
 const refreshesInFlight = new Set();
+
+// Bump when the shape of cached HTML changes (e.g. layout changes), so a deploy
+// never serves pages cached by the previous version.
+const CACHE_VERSION = 'v2';
 
 const isCacheablePath = (path) => CACHEABLE_PATHS.some(re => re.test(path));
 const generationKey = (origin) => new Request(`${origin}/__natrio-cache-generation`);
@@ -164,7 +174,7 @@ async function cacheKeyFor(url) {
     if (TRACKING_PARAMS.test(name)) u.searchParams.delete(name);
   }
   u.searchParams.sort();
-  u.searchParams.set('__gen', await getCacheGeneration(u.origin));
+  u.searchParams.set('__gen', `${CACHE_VERSION}-${await getCacheGeneration(u.origin)}`);
   return new Request(u.toString(), { method: 'GET' });
 }
 
@@ -309,6 +319,14 @@ app.use('*', async (c, next) => {
   if (ALTERNATE_HOSTS.includes(url.hostname.toLowerCase())) {
     return c.redirect(`https://${CANONICAL_HOST}${url.pathname}${url.search}`, 301);
   }
+  // Trailing slashes: /product/x/ → /product/x (one canonical form per page).
+  if ((c.req.method === 'GET' || c.req.method === 'HEAD') && url.pathname.length > 1 &&
+      url.pathname.endsWith('/') && !url.pathname.startsWith('/api/')) {
+    // Collapse leading slashes too: "//evil.com/" must never become a
+    // protocol-relative Location header (open redirect).
+    const target = url.pathname.replace(/\/+$/, '').replace(/^\/+/, '/') || '/';
+    return c.redirect(`${target}${url.search}`, 301);
+  }
   const ctx = newRequestContext(url.origin);
   await als.run(ctx, () => next());
   c.executionCtx.waitUntil(als.run(ctx, () => finishRequestContext(ctx)));
@@ -351,6 +369,19 @@ app.use('*', async (c, next) => {
     c.executionCtx.waitUntil(cache.put(key, stored).catch(err => console.error('Cache put failed:', err.message)));
     c.res = forBrowser(c.res, isRefresh ? 'REFRESH' : 'MISS');
   }
+});
+
+// Server-rendered header/footer on every storefront HTML page (runs inside
+// the edge cache, so cached pages already include it).
+app.use('*', async (c, next) => {
+  await next();
+  const ct = c.res.headers.get('Content-Type') || '';
+  if (!ct.includes('text/html') || c.req.method === 'HEAD' || (c.res.status !== 200 && c.res.status !== 404)) return;
+  const html = await c.res.text();
+  const headers = new Headers(c.res.headers);
+  headers.delete('Content-Length');
+  headers.delete('ETag');
+  c.res = new Response(applyLayout(html), { status: c.res.status, headers });
 });
 
 app.onError((err, c) => {
@@ -443,19 +474,22 @@ app.get('/sitemap.xml', async (c) => {
     { loc: '/shipping-policy.html', priority: '0.3', changefreq: 'monthly' },
     { loc: '/privacy-policy.html', priority: '0.3', changefreq: 'monthly' }
   ];
+  // lastmod only where a real modification date exists (admin edits set
+  // updatedAt from now on; blog posts fall back to their publish date).
+  const isoDay = (d) => { const t = d ? new Date(d) : null; return t && !isNaN(t) ? t.toISOString().split('T')[0] : undefined; };
   const categoryUrls = categories.map(cat => ({ loc: `/products/${categorySlug(cat.title)}`, priority: '0.7', changefreq: 'weekly' }));
-  const productUrls = products.map(p => ({ loc: `/product/${p.id}`, priority: '0.8', changefreq: 'weekly' }));
+  const productUrls = products.map(p => ({ loc: `/product/${encodeURIComponent(p.id)}`, priority: '0.8', changefreq: 'weekly', lastmod: isoDay(p.updatedAt) }));
   const blogUrls = blogPosts.map(b => ({
-    loc: `/blog-post.html?slug=${b.slug}`,
+    loc: blogPath(b.slug),
     priority: '0.6', changefreq: 'monthly',
-    lastmod: b.date ? b.date.split('T')[0] : undefined
+    lastmod: isoDay(b.updatedAt || b.date)
   }));
   const allUrls = [...staticUrls, ...categoryUrls, ...productUrls, ...blogUrls];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${allUrls.map(u => `  <url>
-    <loc>${SITE_URL}${u.loc}</loc>
+    <loc>${xmlEscape(SITE_URL + u.loc)}</loc>
     ${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}
     <changefreq>${u.changefreq}</changefreq>
     <priority>${u.priority}</priority>
@@ -488,13 +522,13 @@ app.get('/product-feed.xml', async (c) => {
     const availability = p.stock > 0 ? 'in stock' : 'out of stock';
 
     variants.forEach((v) => {
-      const itemId = variants.length > 1 ? `${p.id}-${v.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : p.id;
+      const itemId = variantItemId(p, v, variants.length);
       items.push(`
     <item>
       <g:id>${xmlEscape(itemId)}</g:id>
       <title>${xmlEscape(`${p.title}${variants.length > 1 ? ` - ${v.name}` : ''}`)}</title>
       <description>${xmlEscape(description)}</description>
-      <link>${SITE_URL}/product/${encodeURIComponent(p.id)}</link>
+      <link>${xmlEscape(productVariantUrl(p, v, variants.length))}</link>
       <g:image_link>${xmlEscape(imageUrl)}</g:image_link>
       ${additionalImages.map(img => `<g:additional_image_link>${xmlEscape(img)}</g:additional_image_link>`).join('\n      ')}
       <g:availability>${availability}</g:availability>
@@ -523,9 +557,20 @@ ${items.join('')}
 
 // ---------- Server-rendered homepage ----------
 app.get('/', async (c) => {
-  const [heroSlides, categories, products] = await Promise.all([
-    readJSON(HERO_FILE), readJSON(CATEGORIES_FILE), readJSON(PRODUCTS_FILE)
+  const [heroSlides, categories, products, blogPosts] = await Promise.all([
+    readJSON(HERO_FILE), readJSON(CATEGORIES_FILE), readJSON(PRODUCTS_FILE), readJSON(BLOG_FILE)
   ]);
+  const latestPosts = publishedPostsNewestFirst(blogPosts).slice(0, 4);
+  const ssrBlog = latestPosts.map(b => `
+        <div class="product-card">
+          <a href="${blogPath(b.slug)}">
+            <div class="thumb">${b.image ? `<img src="${xmlEscape(b.image)}" alt="${xmlEscape(postTitleText(b))}" loading="lazy">` : ''}</div>
+          </a>
+          <div class="body">
+            <h3><a href="${blogPath(b.slug)}">${xmlEscape(postTitleText(b))}</a></h3>
+            <a class="read-more" href="${blogPath(b.slug)}" style="font-size:13px;color:var(--olive);border-bottom:1px solid var(--olive);padding-bottom:2px;">Read more</a>
+          </div>
+        </div>`).join('');
 
   const hero = heroSlides[0] || {};
   const heroHeading = hero.heading || '';
@@ -576,7 +621,8 @@ app.get('/', async (c) => {
   const html = homePageTemplate
     .replace('<div id="heroSlides"></div>', `<div id="heroSlides">${ssrHero}</div>`)
     .replace('<div class="category-strip" id="categoryStrip"></div>', `<div class="category-strip" id="categoryStrip">${ssrCategories}</div>`)
-    .replace('<div class="slider-row" id="bestsellerSlider"></div>', `<div class="slider-row" id="bestsellerSlider">${ssrBestsellers}</div>`);
+    .replace('<div class="slider-row" id="bestsellerSlider"></div>', `<div class="slider-row" id="bestsellerSlider">${ssrBestsellers}</div>`)
+    .replace('<div class="slider-row" id="blogSlider"></div>', `<div class="slider-row" id="blogSlider">${ssrBlog}</div>`);
 
   return c.html(html);
 });
@@ -592,12 +638,250 @@ function categorySlug(title) {
   return String(title || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
-async function renderProductPage(id) {
-  const products = await readJSON(PRODUCTS_FILE);
+// ---------- SEO helpers ----------
+// JSON for <script type="application/ld+json">; escapes "<" so content can
+// never close the script tag early.
+const ldJson = (obj) => JSON.stringify(obj).replace(/</g, '\\u003c');
+
+function breadcrumbJsonLd(items) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map(([name, url], i) => ({ '@type': 'ListItem', position: i + 1, name, item: url }))
+  };
+}
+
+// Blog titles are stored HTML-encoded (e.g. "Hair &amp; Scalp"); decode for
+// text contexts, then escape again wherever it goes back into HTML.
+function decodeEntities(str) {
+  return String(str || '')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)))
+    .replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+}
+const htmlToText = (html) => decodeEntities(String(html || '').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+
+function truncateWords(text, max) {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  return cut.slice(0, Math.max(cut.lastIndexOf(' '), 40)).replace(/[\s,;:.–—-]+$/, '') + '…';
+}
+
+const blogPath = (slug) => `/blog/${encodeURIComponent(slug)}`;
+const postTitleText = (post) => decodeEntities(post.title);
+// Same order as GET /api/blog (newest first), published posts only.
+const publishedPostsNewestFirst = (posts) => (posts || []).filter(p => p.published !== false).slice().reverse();
+
+// Excerpt if set, else the article's first real paragraph.
+function postSummary(post, max = 155) {
+  if (post.excerpt && String(post.excerpt).trim()) return truncateWords(htmlToText(post.excerpt), max);
+  const body = String(post.body || '').replace(/<h1\b[\s\S]*?<\/h1>/i, '');
+  const firstPara = [...body.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map(m => htmlToText(m[1])).find(t => t.length >= 60);
+  return truncateWords(firstPara || htmlToText(body) || postTitleText(post), max);
+}
+
+// ---------- Product variant URLs (shared by page, JSON-LD and feed) ----------
+function variantItemId(p, v, variantCount) {
+  return variantCount > 1 ? `${p.id}-${String(v.name).toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : p.id;
+}
+function productVariantUrl(p, v, variantCount) {
+  const base = `${SITE_URL}/product/${encodeURIComponent(p.id)}`;
+  return variantCount > 1 ? `${base}?variant=${encodeURIComponent(v.name)}` : base;
+}
+
+// Shipping and returns markup, built only from the store's own settings and
+// published policy (shipping-policy.html: 7-day returns, buyer pays return
+// shipping; delivery 1–3 business days; same/next-day processing).
+function offerPolicies(shippingMethods) {
+  const out = {
+    hasMerchantReturnPolicy: {
+      '@type': 'MerchantReturnPolicy',
+      applicableCountry: 'PK',
+      returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+      merchantReturnDays: 7,
+      returnMethod: 'https://schema.org/ReturnByMail',
+      returnFees: 'https://schema.org/ReturnFeesCustomerResponsibility'
+    }
+  };
+  const m = Array.isArray(shippingMethods) ? shippingMethods[0] : null;
+  if (m && m.cost !== undefined && m.cost !== null && !isNaN(Number(m.cost))) {
+    const details = {
+      '@type': 'OfferShippingDetails',
+      shippingRate: { '@type': 'MonetaryAmount', value: Number(m.cost), currency: 'PKR' },
+      shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'PK' }
+    };
+    const days = /(\d+)\s*[–-]\s*(\d+)\s*business days/i.exec(String(m.description || ''));
+    if (days) {
+      details.deliveryTime = {
+        '@type': 'ShippingDeliveryTime',
+        handlingTime: { '@type': 'QuantitativeValue', minValue: 0, maxValue: 1, unitCode: 'DAY' },
+        transitTime: { '@type': 'QuantitativeValue', minValue: Number(days[1]), maxValue: Number(days[2]), unitCode: 'DAY' }
+      };
+    }
+    out.shippingDetails = details;
+  }
+  return out;
+}
+
+// ---------- Legacy / mistyped internal URLs ----------
+// Maps old link forms (found inside existing blog posts and old bookmarks) to
+// the real page: /product.html?id=x, /products/<product id>,
+// /products/natrio-organics-<product>-60ml, /<category-slug>, /<product-id>.
+const looseProductKey = (s) => String(s || '').toLowerCase().replace(/^natrio-organics?-/, '').replace(/-\d+\s*ml$/, '');
+
+function findProductBySlug(slug, products) {
+  return products.find(p => p.id === slug) || products.find(p => looseProductKey(p.id) === looseProductKey(slug)) || null;
+}
+
+function canonicalPathFor(path, search, products, categories) {
+  const clean = path.replace(/\/+$/, '') || '/';
+  if (clean === '/' || clean === '/index.html') return '/';
+  if (clean === '/product.html') {
+    const id = new URLSearchParams(search || '').get('id');
+    const p = id && findProductBySlug(id, products);
+    return p ? `/product/${encodeURIComponent(p.id)}` : null;
+  }
+  const seg = clean.split('/').filter(Boolean);
+  if (seg.length === 2 && seg[0] === 'products') {
+    const slug = decodeURIComponent(seg[1]);
+    if (categories.some(cat => categorySlug(cat.title) === slug)) return `/products/${slug}`;
+    const p = findProductBySlug(slug, products);
+    return p ? `/product/${encodeURIComponent(p.id)}` : null;
+  }
+  if (seg.length === 1 && !seg[0].includes('.')) {
+    const slug = decodeURIComponent(seg[0]);
+    if (categories.some(cat => categorySlug(cat.title) === slug)) return `/products/${slug}`;
+    const p = findProductBySlug(slug, products);
+    if (p) return `/product/${encodeURIComponent(p.id)}`;
+  }
+  return null;
+}
+
+async function legacyRedirectFor(path, search = '') {
+  const [products, categories] = await Promise.all([readJSON(PRODUCTS_FILE), readJSON(CATEGORIES_FILE)]);
+  const target = canonicalPathFor(path, search, products, categories);
+  return target && target !== path ? target : null;
+}
+
+// Rewrites links inside stored article HTML to their final URLs (so crawlers
+// don't hop through redirects). The stored post is not modified.
+function rewriteInternalLinks(html, products, categories) {
+  return String(html || '').replace(/href="([^"]*)"/gi, (m, href) => {
+    const abs = /^https?:\/\/(www\.)?natrio\.pk(?=\/|$|\?)/i;
+    if (!abs.test(href) && !href.startsWith('/')) return m;
+    const rel = href.replace(abs, '') || '/';
+    const [p, q] = rel.split('?');
+    const target = canonicalPathFor(p, q ? `?${q}` : '', products, categories);
+    return `href="${target || rel}"`;
+  });
+}
+
+function notFound(c) {
+  return c.html(notFoundTemplate, 404, { 'X-Robots-Tag': 'noindex' });
+}
+
+// ---------- Blog article page ----------
+// Products whose name appears in the article (e.g. "castor", "rosehip"),
+// most-mentioned first; falls back to bestsellers.
+function relatedProductsForPost(post, products) {
+  const text = `${postTitleText(post)} ${htmlToText(post.body)}`.toLowerCase();
+  const keyFor = (p) => {
+    const words = String(p.title).replace(/natrio organics?/i, '').replace(/\d+\s*ml/i, '').trim().toLowerCase().split(/\s+/);
+    return words[0] === 'rose' && words[1] === 'water' ? 'rose water' : words[0];
+  };
+  const scored = products
+    .filter(p => p.stock > 0)
+    .map(p => ({ p, n: text.split(keyFor(p)).length - 1 }))
+    .filter(x => x.n > 0)
+    .sort((a, b) => b.n - a.n)
+    .map(x => x.p);
+  const fallback = products.filter(p => p.stock > 0 && p.bestseller && !scored.includes(p));
+  return [...scored, ...fallback].slice(0, 3);
+}
+
+async function renderBlogPost(slug) {
+  const [posts, products, categories] = await Promise.all([readJSON(BLOG_FILE), readJSON(PRODUCTS_FILE), readJSON(CATEGORIES_FILE)]);
+  const published = publishedPostsNewestFirst(posts);
+  const post = published.find(p => p.slug === slug);
+  if (!post) return null;
+
+  const title = postTitleText(post);
+  const pageUrl = `${SITE_URL}${blogPath(post.slug)}`;
+  const description = postSummary(post, 155);
+  const imgUrl = post.image ? `${SITE_URL}${post.image}` : `${SITE_URL}/images/logo.png`;
+  const validDate = (d) => { const t = d ? new Date(d) : null; return t && !isNaN(t) ? t : null; };
+  const publishedAt = validDate(post.date);
+  const modifiedAt = validDate(post.updatedAt) || publishedAt;
+  const fmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Karachi' });
+
+  // One H1 per page: drop a leading body H1 that repeats the title (12 posts
+  // have one), and demote any other H1 inside the body to H2.
+  const norm = (s) => htmlToText(s).toLowerCase().replace(/[^a-z0-9]+/g, '');
+  let body = String(post.body || '').replace(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i, (m, inner) => (norm(inner) === norm(post.title) ? '' : m));
+  body = body.replace(/<h1\b/gi, '<h2').replace(/<\/h1>/gi, '</h2>');
+  body = rewriteInternalLinks(body, products, categories);
+
+  const related = relatedProductsForPost(post, products);
+  const more = published.filter(p => p.slug !== post.slug).slice(0, 3);
+
+  const articleLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: title,
+    description,
+    image: [imgUrl],
+    url: pageUrl,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': pageUrl },
+    ...(publishedAt ? { datePublished: publishedAt.toISOString() } : {}),
+    ...(modifiedAt ? { dateModified: modifiedAt.toISOString() } : {}),
+    author: { '@type': 'Organization', name: 'Natrio Organics', url: `${SITE_URL}/` },
+    publisher: { '@type': 'Organization', name: 'Natrio Organics', logo: { '@type': 'ImageObject', url: `${SITE_URL}/images/logo.png` } }
+  };
+  const crumbLd = breadcrumbJsonLd([['Home', `${SITE_URL}/`], ['Blog', `${SITE_URL}/blog.html`], [title, pageUrl]]);
+
+  const content = `
+    <nav class="post-crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span class="sep">/</span><a href="/blog.html">Blog</a><span class="sep">/</span><span>${xmlEscape(title)}</span></nav>
+    <article>
+      <h1>${xmlEscape(title)}</h1>
+      ${publishedAt ? `<div class="post-date"><time datetime="${publishedAt.toISOString()}">${fmt(publishedAt)}</time>${modifiedAt && modifiedAt.getTime() !== publishedAt.getTime() ? ` · Updated <time datetime="${modifiedAt.toISOString()}">${fmt(modifiedAt)}</time>` : ''}</div>` : ''}
+      ${post.image ? `<div class="post-image"><img src="${xmlEscape(post.image)}" alt="${xmlEscape(title)}" width="1600" height="900" fetchpriority="high"></div>` : ''}
+      <div class="post-body">${body}</div>
+    </article>
+    ${related.length ? `
+    <section class="post-related">
+      <h2>Shop the oils from this guide</h2>
+      <div class="product-grid">${related.map(ssrProductCard).join('')}</div>
+    </section>` : ''}
+    ${more.length ? `
+    <section class="post-related post-more">
+      <h2>More hair &amp; skin care guides</h2>
+      <ul>${more.map(p => `<li><a href="${blogPath(p.slug)}">${xmlEscape(postTitleText(p))}</a></li>`).join('')}</ul>
+      <p><a href="/blog.html">See all articles</a></p>
+    </section>` : ''}`;
+
+  const fill = (tpl, key, value) => tpl.split(`{{${key}}}`).join(value);
+  let html = blogPostTemplate;
+  html = fill(html, 'TITLE', xmlEscape(`${title} — Natrio Organics`));
+  html = fill(html, 'OG_TITLE', xmlEscape(`${title} — Natrio Organics`));
+  html = fill(html, 'DESCRIPTION', xmlEscape(description));
+  html = fill(html, 'CANONICAL', xmlEscape(pageUrl));
+  html = fill(html, 'OG_IMAGE', xmlEscape(imgUrl));
+  html = fill(html, 'PUBLISHED', publishedAt ? publishedAt.toISOString() : '');
+  html = fill(html, 'MODIFIED', modifiedAt ? modifiedAt.toISOString() : '');
+  html = fill(html, 'JSON_LD', `<script type="application/ld+json">${ldJson(articleLd)}</script>\n  <script type="application/ld+json">${ldJson(crumbLd)}</script>`);
+  html = fill(html, 'CONTENT', content); // last, so article text is never treated as a placeholder
+  return html;
+}
+
+// Returns null when the product doesn't exist (caller sends a real 404).
+async function renderProductPage(id, requestedVariant) {
+  const [products, shippingMethods] = await Promise.all([readJSON(PRODUCTS_FILE), readJSON(SHIPPING_FILE)]);
   const p = id ? products.find(x => x.id === id) : null;
-  if (!p) return productPageTemplate;
+  if (!p) return null;
 
   const variants = normalizeVariants(p);
+  const selected = variants.find(v => v.name === requestedVariant) || variants[0];
   const shortDesc = xmlEscape((p.shortDescription || stripHtml(p.description) || p.title).slice(0, 155));
   const pageUrl = `${SITE_URL}/product/${encodeURIComponent(p.id)}`;
   const imgUrl = p.image ? `${SITE_URL}${p.image}` : `${SITE_URL}/images/logo.png`;
@@ -611,16 +895,26 @@ async function renderProductPage(id) {
     description: stripHtml(p.description) || p.title,
     sku: p.sku || p.id,
     brand: { '@type': 'Brand', name: 'Natrio Organics' },
-    offers: {
-      '@type': 'AggregateOffer',
-      url: pageUrl,
+    // One Offer per size, each with the same URL and SKU (g:id) the
+    // Merchant Center feed uses, so feed, landing page and markup agree.
+    offers: variants.map(v => ({
+      '@type': 'Offer',
+      url: productVariantUrl(p, v, variants.length),
+      sku: variantItemId(p, v, variants.length),
+      name: variants.length > 1 ? `${p.title} - ${v.name}` : p.title,
       priceCurrency: 'PKR',
-      lowPrice: Math.min(...variants.map(v => v.price)),
-      highPrice: Math.max(...variants.map(v => v.price)),
-      offerCount: variants.length,
-      availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock'
-    }
+      price: v.price.toFixed(2),
+      itemCondition: 'https://schema.org/NewCondition',
+      availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      seller: { '@type': 'Organization', name: 'Natrio Organics' },
+      ...offerPolicies(shippingMethods)
+    }))
   };
+  const breadcrumbLd = breadcrumbJsonLd([
+    ['Home', `${SITE_URL}/`],
+    [p.category, `${SITE_URL}/products/${categorySlug(p.category)}`],
+    [p.title, pageUrl]
+  ]);
 
   const ssrBreadcrumb = `
     <a href="/">Home</a><span class="sep">/</span>
@@ -640,7 +934,8 @@ async function renderProductPage(id) {
         <strong>Category:</strong> ${xmlEscape(p.category)}
       </div>
       <p class="pd-desc">${shortDesc}</p>
-      <div class="pd-price">Rs. ${variants[0].price.toLocaleString()}${variants.length > 1 ? ' – Rs. ' + Math.max(...variants.map(v => v.price)).toLocaleString() : ''}</div>
+      <div class="pd-price">Rs. ${selected.price.toLocaleString()}${variants.length > 1 ? ` <small>(${xmlEscape(selected.name)})</small>` : ''}</div>
+      ${variants.length > 1 ? `<p class="pd-sizes">Available sizes: ${variants.map(v => `<a href="${xmlEscape(productVariantUrl(p, v, variants.length).replace(SITE_URL, ''))}">${xmlEscape(v.name)} — Rs. ${v.price.toLocaleString()}</a>`).join(' · ')}</p>` : ''}
       <p>${stripHtml(p.description) ? xmlEscape(stripHtml(p.description)) : ''}</p>
     </div>`;
 
@@ -670,12 +965,15 @@ async function renderProductPage(id) {
       '<meta property="og:image" id="ogImage" content="https://natrio.pk/images/logo.png">',
       `<meta property="og:image" id="ogImage" content="${xmlEscape(imgUrl)}">`
     )
-    .replace('</head>', `  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>\n</head>`)
+    .replace('</head>', `  <script type="application/ld+json">${ldJson(jsonLd)}</script>\n  <script type="application/ld+json">${ldJson(breadcrumbLd)}</script>\n</head>`)
     .replace('<div class="breadcrumb" id="breadcrumb"></div>', `<div class="breadcrumb" id="breadcrumb">${ssrBreadcrumb}</div>`)
     .replace('<div class="pd-layout" id="pd">Loading…</div>', `<div class="pd-layout" id="pd">${ssrContent}</div>`);
 }
 
-app.get('/product/:id', async (c) => c.html(await renderProductPage(c.req.param('id'))));
+app.get('/product/:id', async (c) => {
+  const html = await renderProductPage(c.req.param('id'), c.req.query('variant'));
+  return html ? c.html(html) : notFound(c);
+});
 
 function ssrProductCard(p) {
   const variants = normalizeVariants(p);
@@ -707,7 +1005,7 @@ async function renderProductsPage(categoryTitle) {
   const ssrGrid = filtered.length ? filtered.map(ssrProductCard).join('') : `<div class="empty-state">No products found.</div>`;
 
   return productsPageTemplate
-    .replace('<title>Shop All Products — Natrio Organics</title>', `<title>${xmlEscape(pageTitle)}${categoryTitle ? '' : ' — Shop All Products'} — Natrio Organics</title>`)
+    .replace('<title>Shop All Products — Natrio Organics</title>', `<title>${categoryTitle ? `${xmlEscape(categoryTitle)} — Natrio Organics` : 'Shop All Products — Natrio Organics'}</title>`)
     .replace(
       "<meta name=\"description\" content=\"Browse Natrio Organics' full range of pure, cold-pressed hair oils and facial care products. Nationwide delivery across Pakistan.\">",
       `<meta name="description" content="${xmlEscape(description)}">`
@@ -727,9 +1025,14 @@ async function renderProductsPage(categoryTitle) {
 }
 
 app.get('/products/:slug', async (c) => {
+  const slug = c.req.param('slug');
   const categories = await readJSON(CATEGORIES_FILE);
-  const match = categories.find(cat => categorySlug(cat.title) === c.req.param('slug'));
-  return c.html(await renderProductsPage(match ? match.title : null));
+  const match = categories.find(cat => categorySlug(cat.title) === slug);
+  if (match) return c.html(await renderProductsPage(match.title));
+  // Older links (e.g. inside blog posts) used /products/<product> — send
+  // those to the real product page; anything else is a genuine 404.
+  const legacy = await legacyRedirectFor(`/products/${slug}`);
+  return legacy ? c.redirect(legacy, 301) : notFound(c);
 });
 
 app.get('/products.html', async (c) => {
@@ -738,10 +1041,50 @@ app.get('/products.html', async (c) => {
   return c.html(await renderProductsPage(null));
 });
 
+// Bare /product.html (no product) isn't a page of its own any more.
 app.get('/product.html', async (c) => {
   const id = c.req.query('id');
   if (id) return c.redirect(`/product/${encodeURIComponent(id)}`, 301);
-  return c.html(productPageTemplate);
+  return c.redirect('/products.html', 301);
+});
+
+// ---------- Blog (server-rendered, clean URLs) ----------
+app.get('/blog', (c) => c.redirect('/blog.html', 301));
+
+app.get('/blog.html', async (c) => {
+  const posts = publishedPostsNewestFirst(await readJSON(BLOG_FILE));
+  const grid = posts.length
+    ? posts.map(b => `
+        <div class="blog-card">
+          <a href="${blogPath(b.slug)}">
+            <div class="thumb">${b.image ? `<img src="${xmlEscape(b.image)}" alt="${xmlEscape(postTitleText(b))}" loading="lazy">` : ''}</div>
+          </a>
+          <div class="body">
+            <h3><a href="${blogPath(b.slug)}">${xmlEscape(postTitleText(b))}</a></h3>
+            <p>${xmlEscape(postSummary(b, 160))}</p>
+            <a class="read-more" href="${blogPath(b.slug)}">Read more</a>
+          </div>
+        </div>`).join('')
+    : `<div class="empty-state">No posts yet — check back soon.</div>`;
+  const html = blogIndexTemplate.replace(
+    /<div class="blog-grid" id="blogGrid"([^>]*)><\/div>/,
+    (m, attrs) => `<div class="blog-grid" id="blogGrid"${attrs}>${grid}</div>`
+  );
+  return c.html(html);
+});
+
+// Old article URLs → permanent redirect to the clean URL. Unknown slugs are
+// a real 404 (never redirected to the blog index).
+app.get('/blog-post.html', async (c) => {
+  const slug = c.req.query('slug');
+  if (!slug) return c.redirect('/blog.html', 301);
+  const post = publishedPostsNewestFirst(await readJSON(BLOG_FILE)).find(p => p.slug === slug);
+  return post ? c.redirect(blogPath(post.slug), 301) : notFound(c);
+});
+
+app.get('/blog/:slug', async (c) => {
+  const html = await renderBlogPost(c.req.param('slug'));
+  return html ? c.html(html) : notFound(c);
 });
 
 // ---------- helpers ----------
@@ -1473,7 +1816,8 @@ app.put('/api/admin/blog/:id', requireAdmin, async (c) => {
     excerpt: excerpt ?? posts[idx].excerpt,
     body: postBody ?? posts[idx].body,
     image: image ?? posts[idx].image,
-    published: published !== undefined ? published : posts[idx].published
+    published: published !== undefined ? published : posts[idx].published,
+    updatedAt: new Date().toISOString()
   };
   await writeJSON(BLOG_FILE, posts);
   return c.json({ success: true, post: posts[idx] });
@@ -1776,7 +2120,8 @@ app.post('/api/admin/products', requireAdmin, async (c) => {
     sku: b.sku || '',
     ingredients: b.ingredients || '',
     howToUse: b.howToUse || '',
-    benefits: b.benefits || ''
+    benefits: b.benefits || '',
+    updatedAt: new Date().toISOString()
   };
   products.push(newProduct);
   await writeJSON(PRODUCTS_FILE, products);
@@ -1802,6 +2147,7 @@ app.put('/api/admin/products/:id', requireAdmin, async (c) => {
   }
   b.featured = !!b.featured;
   b.bestseller = !!b.bestseller;
+  b.updatedAt = new Date().toISOString();
 
   products[idx] = { ...products[idx], ...b };
   await writeJSON(PRODUCTS_FILE, products);
@@ -1815,7 +2161,17 @@ app.delete('/api/admin/products/:id', requireAdmin, async (c) => {
 });
 
 // ---------- Static files (everything in ../public) ----------
-app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw));
+app.all('*', async (c) => {
+  const res = await c.env.ASSETS.fetch(c.req.raw);
+  if (res.status !== 404 || !['GET', 'HEAD'].includes(c.req.method)) return res;
+  const url = new URL(c.req.url);
+  // Only page-like paths get the HTML treatment; missing images/scripts stay plain 404s.
+  const last = url.pathname.split('/').pop();
+  if (last.includes('.') && !last.endsWith('.html')) return res;
+  if (url.pathname.startsWith('/api/')) return c.json({ error: 'Not found' }, 404);
+  const legacy = await legacyRedirectFor(url.pathname, url.search);
+  return legacy ? c.redirect(legacy, 301) : notFound(c);
+});
 
 // ---------- Cron: abandoned carts every 15 min, review requests hourly ----------
 async function runSweeps(scheduledTime) {
