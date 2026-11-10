@@ -29,7 +29,9 @@
 
   <script src="/script.js"></script>
   <script>
-    fetch('/api/blog').then(r => r.json()).then(list => {
+    // The server already renders the list (with crawlable links); this only
+    // runs as a fallback if that didn't happen.
+    if (!document.getElementById('blogGrid').children.length) fetch('/api/blog').then(r => r.json()).then(list => {
       const grid = document.getElementById('blogGrid');
       if (!list.length) {
         grid.innerHTML = `<div class="empty-state">No posts yet — check back soon.</div>`;
@@ -37,13 +39,13 @@
       }
       grid.innerHTML = list.map(b => `
         <div class="blog-card">
-          <a href="/blog-post.html?slug=${b.slug}">
+          <a href="/blog/${encodeURIComponent(b.slug)}">
             <div class="thumb">${b.image ? `<img src="${b.image}" alt="${b.title}" onerror="this.parentElement.style.background='var(--cream-deep)';this.remove()">` : ''}</div>
           </a>
           <div class="body">
-            <h3><a href="/blog-post.html?slug=${b.slug}">${b.title}</a></h3>
+            <h3><a href="/blog/${encodeURIComponent(b.slug)}">${b.title}</a></h3>
             <p>${b.excerpt || ''}</p>
-            <a class="read-more" href="/blog-post.html?slug=${b.slug}">Read more</a>
+            <a class="read-more" href="/blog/${encodeURIComponent(b.slug)}">Read more</a>
           </div>
         </div>
       `).join('');

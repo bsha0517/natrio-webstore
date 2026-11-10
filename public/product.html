@@ -131,7 +131,7 @@
   </section>
 
   <div class="sticky-atc" id="stickyAtc">
-    <img id="stickyImg" src="" alt="">
+    <img id="stickyImg" alt="">
     <div class="info">
       <div class="t" id="stickyTitle"></div>
       <div class="p" id="stickyPrice"></div>
@@ -179,27 +179,8 @@
       document.getElementById('ogUrl').setAttribute('content', pageUrl);
       document.getElementById('ogImage').setAttribute('content', imgUrl);
 
-      const ldScript = document.createElement('script');
-      ldScript.type = 'application/ld+json';
-      ldScript.textContent = JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'Product',
-        name: p.title,
-        image: [p.image, p.hoverImage, p.image3, p.image4].filter(Boolean).map(src => `https://natrio.pk${src}`),
-        description: shortDesc || p.title,
-        sku: p.sku || p.id,
-        brand: { '@type': 'Brand', name: 'Natrio Organics' },
-        offers: {
-          '@type': 'AggregateOffer',
-          url: pageUrl,
-          priceCurrency: 'PKR',
-          lowPrice: Math.min(...variants.map(v => v.price)),
-          highPrice: Math.max(...variants.map(v => v.price)),
-          offerCount: variants.length,
-          availability: p.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock'
-        }
-      });
-      document.head.appendChild(ldScript);
+      // Product + Breadcrumb structured data is rendered by the server
+      // (worker/src/index.js); adding it again here would duplicate it.
 
       // breadcrumb
       document.getElementById('breadcrumb').innerHTML = `
@@ -354,6 +335,14 @@
         if (addBtn && p.stock > 0) addBtn.textContent = `Add to Cart — ${money(selected.price)}`;
         document.getElementById('stickyPrice').textContent = money(selected.price);
       });
+
+      // Preselect the size named in ?variant= (used by Merchant Center feed
+      // links) so the landing page shows that size's price.
+      const wantedVariant = new URLSearchParams(location.search).get('variant');
+      if (wantedVariant && variants.some(v => v.name === wantedVariant)) {
+        variantSelect.value = wantedVariant;
+        variantSelect.dispatchEvent(new Event('change'));
+      }
 
       // wishlist (local, non-persistent placeholder)
       document.getElementById('wishlistBtn').addEventListener('click', function() {

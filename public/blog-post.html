@@ -3,14 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Blog — Natrio Organics</title>
-  <meta name="description" id="metaDescription" content="Natural hair and skin care guides from Natrio Organics.">
-  <link rel="canonical" id="canonicalLink" href="https://natrio.pk/blog.html">
+  <!-- Server-rendered by worker/src/index.js (route /blog/:slug). The
+       {{…}} placeholders are filled in for each article. -->
+  <title>{{TITLE}}</title>
+  <meta name="description" content="{{DESCRIPTION}}">
+  <link rel="canonical" href="{{CANONICAL}}">
   <meta property="og:type" content="article">
-  <meta property="og:title" id="ogTitle" content="Natrio Organics Blog">
-  <meta property="og:description" id="ogDescription" content="Natural hair and skin care guides from Natrio Organics.">
-  <meta property="og:url" id="ogUrl" content="https://natrio.pk/blog.html">
-  <meta property="og:image" id="ogImage" content="https://natrio.pk/images/logo.png">
+  <meta property="og:site_name" content="Natrio Organics">
+  <meta property="og:title" content="{{OG_TITLE}}">
+  <meta property="og:description" content="{{DESCRIPTION}}">
+  <meta property="og:url" content="{{CANONICAL}}">
+  <meta property="og:image" content="{{OG_IMAGE}}">
+  <meta property="article:published_time" content="{{PUBLISHED}}">
+  <meta property="article:modified_time" content="{{MODIFIED}}">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
@@ -20,6 +25,10 @@
     .post-wrap { max-width: 740px; margin: 0 auto; padding: 40px 24px 80px; }
     .post-wrap .back-link { font-size: 13px; color: var(--muted); display: inline-block; margin-bottom: 20px; }
     .post-wrap .back-link:hover { color: var(--olive); }
+    .post-wrap .post-crumbs { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+    .post-wrap .post-crumbs a { color: var(--muted); }
+    .post-wrap .post-crumbs a:hover { color: var(--olive); }
+    .post-wrap .post-crumbs .sep { margin: 0 6px; }
     .post-wrap h1 { font-size: 30px; margin-bottom: 10px; }
     .post-wrap .post-date { color: var(--muted); font-size: 13px; margin-bottom: 26px; }
     .post-wrap .post-image { width: 100%; aspect-ratio: 16/9; background: var(--cream-deep); margin-bottom: 30px; overflow: hidden; }
@@ -32,58 +41,19 @@
     .post-body li { margin-bottom: 8px; }
     .post-body img { width: 100%; margin: 20px 0; }
     .post-body a { color: var(--olive); border-bottom: 1px solid var(--olive); }
+    .post-related { margin-top: 50px; padding-top: 30px; border-top: 1px solid var(--line, #e5e0d6); }
+    .post-related h2 { font-size: 20px; margin-bottom: 16px; }
+    .post-related .product-grid { margin: 0; padding: 0; }
+    .post-more ul { padding-left: 20px; }
+    .post-more li { margin-bottom: 10px; }
+    .post-more a { color: var(--olive); }
   </style>
+  {{JSON_LD}}
 </head>
 <body>
 
-  <div class="post-wrap" id="postWrap">Loading…</div>
+  <main class="post-wrap" id="postWrap">{{CONTENT}}</main>
 
   <script src="/script.js"></script>
-  <script>
-    const slug = new URLSearchParams(location.search).get('slug');
-    fetch(`/api/blog/${slug}`).then(r => r.json()).then(post => {
-      if (post.error) {
-        document.getElementById('postWrap').innerHTML = `<div class="empty-state">Post not found. <br><br><a href="/blog.html" class="btn btn-dark">Back to Blog</a></div>`;
-        document.title = 'Post Not Found — Natrio Organics';
-        return;
-      }
-      document.title = `${post.title} — Natrio Organics`;
-
-      // ---- SEO: meta tags, canonical, and Article structured data ----
-      const shortExcerpt = post.excerpt || post.body.replace(/<[^>]+>/g, '').slice(0, 155);
-      const pageUrl = `https://natrio.pk/blog-post.html?slug=${post.slug}`;
-      const imgUrl = post.image ? `https://natrio.pk${post.image}` : 'https://natrio.pk/images/logo.png';
-
-      document.getElementById('metaDescription').setAttribute('content', shortExcerpt);
-      document.getElementById('canonicalLink').setAttribute('href', pageUrl);
-      document.getElementById('ogTitle').setAttribute('content', `${post.title} — Natrio Organics`);
-      document.getElementById('ogDescription').setAttribute('content', shortExcerpt);
-      document.getElementById('ogUrl').setAttribute('content', pageUrl);
-      document.getElementById('ogImage').setAttribute('content', imgUrl);
-
-      const ldScript = document.createElement('script');
-      ldScript.type = 'application/ld+json';
-      ldScript.textContent = JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'Article',
-        headline: post.title,
-        image: imgUrl,
-        datePublished: post.date,
-        author: { '@type': 'Organization', name: 'Natrio Organics' },
-        publisher: { '@type': 'Organization', name: 'Natrio Organics', logo: { '@type': 'ImageObject', url: 'https://natrio.pk/images/logo.png' } },
-        description: shortExcerpt,
-        mainEntityOfPage: pageUrl
-      });
-      document.head.appendChild(ldScript);
-
-      document.getElementById('postWrap').innerHTML = `
-        <a href="/blog.html" class="back-link">&larr; Back to all posts</a>
-        <h1>${post.title}</h1>
-        <div class="post-date">${new Date(post.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-        ${post.image ? `<div class="post-image"><img src="${post.image}" alt="${post.title}" onerror="this.parentElement.remove()"></div>` : ''}
-        <div class="post-body">${post.body}</div>
-      `;
-    });
-  </script>
 </body>
 </html>
